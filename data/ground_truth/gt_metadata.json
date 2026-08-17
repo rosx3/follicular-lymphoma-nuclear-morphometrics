@@ -1,0 +1,195 @@
+{
+  "version": "1.0",
+  "step": "Step 2.2 — Ground Truth Reference Dataset Creation",
+  "n_total_gt_patches": 30,
+  "n_fl_patches": 15,
+  "n_reactive_patches": 15,
+  "calibration": {
+    "microns_per_pixel": 0.23,
+    "patch_size_px": 224,
+    "patch_size_um": 51.52
+  },
+  "stratification_strategy": "Density-stratified sampling (5 low, 5 medium, 5 high cell density per class)",
+  "patches_summary": [
+    {
+      "image_name": "FL_examples (249)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 71,
+      "mean_nucleus_area_um2": 3.9
+    },
+    {
+      "image_name": "FL_examples (32)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 128,
+      "mean_nucleus_area_um2": 5.02
+    },
+    {
+      "image_name": "FL_examples (110)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 134,
+      "mean_nucleus_area_um2": 4.33
+    },
+    {
+      "image_name": "FL_examples (108)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 152,
+      "mean_nucleus_area_um2": 4.16
+    },
+    {
+      "image_name": "FL_examples (172)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 147,
+      "mean_nucleus_area_um2": 4.48
+    },
+    {
+      "image_name": "FL_examples (217)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 152,
+      "mean_nucleus_area_um2": 3.9
+    },
+    {
+      "image_name": "FL_examples (253)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 161,
+      "mean_nucleus_area_um2": 5.48
+    },
+    {
+      "image_name": "FL_examples (16)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 164,
+      "mean_nucleus_area_um2": 4.91
+    },
+    {
+      "image_name": "FL_examples (15)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 176,
+      "mean_nucleus_area_um2": 5.21
+    },
+    {
+      "image_name": "FL_examples (11)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 177,
+      "mean_nucleus_area_um2": 5.24
+    },
+    {
+      "image_name": "FL_examples (189)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 170,
+      "mean_nucleus_area_um2": 4.82
+    },
+    {
+      "image_name": "FL_examples (208)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 188,
+      "mean_nucleus_area_um2": 4.28
+    },
+    {
+      "image_name": "FL_examples (299)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 194,
+      "mean_nucleus_area_um2": 5.11
+    },
+    {
+      "image_name": "FL_examples (79)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 201,
+      "mean_nucleus_area_um2": 6.48
+    },
+    {
+      "image_name": "FL_examples (20)",
+      "category": "Follicular Lymphoma",
+      "n_nuclei_gt": 226,
+      "mean_nucleus_area_um2": 3.76
+    },
+    {
+      "image_name": "REACTIVE_examples (232)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 76,
+      "mean_nucleus_area_um2": 3.25
+    },
+    {
+      "image_name": "REACTIVE_examples (233)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 153,
+      "mean_nucleus_area_um2": 6.39
+    },
+    {
+      "image_name": "REACTIVE_examples (262)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 161,
+      "mean_nucleus_area_um2": 5.76
+    },
+    {
+      "image_name": "REACTIVE_examples (16)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 178,
+      "mean_nucleus_area_um2": 6.01
+    },
+    {
+      "image_name": "REACTIVE_examples (215)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 180,
+      "mean_nucleus_area_um2": 5.62
+    },
+    {
+      "image_name": "REACTIVE_examples (54)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 169,
+      "mean_nucleus_area_um2": 4.59
+    },
+    {
+      "image_name": "REACTIVE_examples (86)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 183,
+      "mean_nucleus_area_um2": 4.42
+    },
+    {
+      "image_name": "REACTIVE_examples (18)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 194,
+      "mean_nucleus_area_um2": 6.28
+    },
+    {
+      "image_name": "REACTIVE_examples (85)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 200,
+      "mean_nucleus_area_um2": 4.2
+    },
+    {
+      "image_name": "REACTIVE_examples (48)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 200,
+      "mean_nucleus_area_um2": 4.35
+    },
+    {
+      "image_name": "REACTIVE_examples (11)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 205,
+      "mean_nucleus_area_um2": 5.53
+    },
+    {
+      "image_name": "REACTIVE_examples (22)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 205,
+      "mean_nucleus_area_um2": 6.17
+    },
+    {
+      "image_name": "REACTIVE_examples (285)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 205,
+      "mean_nucleus_area_um2": 5.71
+    },
+    {
+      "image_name": "REACTIVE_examples (244)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 222,
+      "mean_nucleus_area_um2": 5.09
+    },
+    {
+      "image_name": "REACTIVE_examples (103)",
+      "category": "Reactive Tissue",
+      "n_nuclei_gt": 251,
+      "mean_nucleus_area_um2": 4.38
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+image_name,category,ws_dice,ws_iou,ws_aji,ws_f1_det,un_dice,un_iou,un_aji,un_f1_det
+FL_examples (189),Follicular Lymphoma,0.6937,0.531,0.444,0.5574,0.6697,0.5034,0.3817,0.4851
+FL_examples (20),Follicular Lymphoma,0.4132,0.2604,0.228,0.3607,0.3585,0.2184,0.1936,0.289
+FL_examples (217),Follicular Lymphoma,0.6941,0.5316,0.3341,0.4201,0.6415,0.4722,0.3333,0.4112
+FL_examples (15),Follicular Lymphoma,0.7151,0.5565,0.2929,0.3926,0.6653,0.4985,0.2711,0.3004
+FL_examples (108),Follicular Lymphoma,0.6903,0.5271,0.4012,0.4786,0.6246,0.4542,0.3352,0.4464
+REACTIVE_examples (103),Reactive Tissue,0.4458,0.2868,0.2241,0.2801,0.3203,0.1907,0.164,0.1818
+REACTIVE_examples (85),Reactive Tissue,0.6174,0.4465,0.3389,0.3502,0.5032,0.3362,0.2668,0.3154
+REACTIVE_examples (244),Reactive Tissue,0.6512,0.4828,0.3294,0.4056,0.6619,0.4946,0.2881,0.3094
+REACTIVE_examples (215),Reactive Tissue,0.7089,0.549,0.3512,0.4495,0.6417,0.4724,0.347,0.4433
+REACTIVE_examples (233),Reactive Tissue,0.7429,0.591,0.3116,0.4058,0.6514,0.483,0.2925,0.3263
