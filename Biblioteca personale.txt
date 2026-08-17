@@ -1,0 +1,369 @@
+%0 Generic
+
+%0 Web Page
+%T My Library | Zotero
+%U https://www.zotero.org/rosariacervino/library
+
+%0 Journal Article
+%T Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and Explainable Artificial Intelligence (XAI)
+%V 17
+%N 15
+%P 2428
+%X Background/Objectives: The major question that confronts a pathologist when evaluating a lymph node biopsy is whether the process is benign or malignant, and the differential diagnosis between follicular lymphoma and reactive lymphoid tissue can be challenging. Methods: This study designed a convolutional neural network based on ResNet architecture to classify a large series of 221 cases, including 177 follicular lymphoma and 44 reactive lymphoid tissue/lymphoid hyperplasia, which were stained with hematoxylin and eosin (H&E). Explainable artificial intelligence (XAI) methods were used for interpretability. Results: The series included 1,004,509 follicular lymphoma and 490,506 reactive lymphoid tissue image-patches at 224 × 244 × 3, and was partitioned into training (70%), validation (10%), and testing (20%) sets. The performance of the training (training and validation sets) had an accuracy of 99.81%. In the testing set, the performance metrics achieved an accuracy of 99.80% at the image-patch level for follicular lymphoma. The other performance parameters were precision (99.8%), recall (99.8%), false positive rate (0.35%), specificity (99.7%), and F1 score (99.9%). Interpretability was analyzed using three methods: grad-CAM, image LIME, and occlusion sensitivity. Additionally, hybrid partitioning was performed to avoid information leakage using a patient-level independent validation set that confirmed high classification performance. Conclusions: Narrow artificial intelligence (AI) can perform differential diagnosis between follicular lymphoma and reactive lymphoma tissue, but it is task-specific and operates within limited constraints. The trained ResNet convolutional neural network (CNN) may be used as transfer learning for larger series of cases and lymphoma diagnoses in the future.
+%G eng
+%J Cancers
+%A Carreras, Joaquim
+%A Ikoma, Haruka
+%A Kikuti, Yara Yukie
+%A Nagase, Shunsuke
+%A Ito, Atsushi
+%A Orita, Makoto
+%A Tomita, Sakura
+%A Tanigaki, Yuki
+%A Nakamura, Naoya
+%A Masugi, Yohei
+%D 2025-07-22
+%K artificial intelligence
+convolutional neural network
+deep learning
+explainable artificial intelligence
+follicular hyperplasia
+follicular lymphoma
+reactive lymphoid tissue
+
+%0 Journal Article
+%T Small sized centroblasts as poor prognostic factor in follicular lymphoma - Based on artificial intelligence analysis
+%V 178
+%P 108774
+%X Histological assessment of centroblasts is an important evaluation in the diagnosis of follicular lymphoma, but there is substantial observer variation in assessment among hematopathologists. We aimed to perform quantitative morphological analysis of centroblasts in follicular lymphoma using new artificial intelligence technology in relation to the clinical prognosis. Hematoxylin and eosin slides of lesions were prepared from 36 cases of follicular lymphoma before initial chemotherapy. Cases were classified into three groups by clinical course after initial treatment. The 'excellent prognosis' group were without recurrence or progression of follicular lymphoma within 60 months, the 'poor prognosis' group were those that had relapse, exacerbation, or who died due to the follicular lymphoma within 60 months, and the 'indeterminate prognosis' group were those without recurrence or progression but before the passage of 60 months. We created whole slide images and image patches of hematoxylin and eosin sections for all cases. We designed an object detection model specialized for centroblasts by fine-tuning YOLOv5 and segmented all centroblasts in whole slide images. The morphological characteristics of centroblasts in relation to the clinical prognosis of follicular lymphoma were analyzed. Centroblasts in follicular lymphoma of the poor prognosis group were significantly smaller in nuclear size than those in follicular lymphoma of the excellent prognosis group in the following points: median of nuclear area (p = 0.013), long length (p = 0.042), short length (p = 0.007), nuclear area of top 10 % cells (p = 0.024) and short length of top 10 % cells (p = 0.020). Cases with a mean nuclear area of <55 μm2 had poorer event-free survival than those with a mean nuclear area of ≥55 μm2 (p < 0.0123). AI methodology is suggested to be able to surpass pathologist's observation in capturing morphological features. Small-sized centroblasts will likely become a new prognostic factor of follicular lymphoma.
+%G eng
+%J Computers in Biology and Medicine
+%A Iwamoto, Ryuta
+%A Nishikawa, Toui
+%A Musangile, Fidele Yambayamba
+%A Matsuzaki, Ibu
+%A Sagan, Kanako
+%A Nishikawa, Mizuki
+%A Mikasa, Yurina
+%A Takahashi, Yuichi
+%A Kojima, Fumiyoshi
+%A Hori, Yoshikazu
+%A Hosoi, Hiroki
+%A Mori, Hideo
+%A Sonoki, Takashi
+%A Murata, Shin-Ichi
+%D 2024-08
+%K Adult
+Aged
+Artificial Intelligence
+Female
+Humans
+Lymphoma, Follicular
+Male
+Middle Aged
+Prognosis
+
+%0 Web Page
+%T Evolved and Transparent Pipelines for Biomedical Image Classification | Semantic Scholar
+%U https://www.semanticscholar.org/paper/Evolved-and-Transparent-Pipelines-for-Biomedical-Torre-Nadizar/0f07a66edb83957e2f9d7d602c6d98833d4aa5bf
+
+%0 Journal Article
+%T Interpretable deep learning model to predict lymph node metastasis in early gastric cancer using whole slide images
+%V 14
+%N 7
+%P 3513-3522
+%X In early gastric cancer (EGC), the presence of lymph node metastasis (LNM) is a crucial factor for determining the treatment options. Endoscopic resection is used for treatment of EGC with minimal risk of LNM. However, owing to the lack of definitive criteria for identifying patients who require additional surgery, some patients undergo unnecessary additional surgery. Considering that histopathologic patterns are significant factor for predicting lymph node metastasis in gastric cancer, we aimed to develop a machine learning algorithm which can predict LNM status using hematoxylin and eosin (H&E)-stained images. The images were obtained from several institutions. Our pipeline comprised two sequential approaches including a feature extractor and a risk classifier. For the feature extractor, a segmentation network (DeepLabV3+) was trained on 243 WSIs across three datasets to differentiate each histological subtype. The risk classifier was trained with XGBoost using 70 morphological features inferred from the trained feature extractor. The trained segmentation network, the feature extractor, achieved high performance, with pixel accuracies of 0.9348 and 0.8939 for the internal and external datasets in patch level, respectively. The risk classifier achieved an overall AUC of 0.75 in predicting LNM status. Remarkably, one of the datasets also showed a promising result with an AUC of 0.92. This is the first multi-institution study to develop machine learning algorithm for predicting LNM status in patients with EGC using H&E-stained histopathology images. Our findings have the potential to improve the selection of patients who require surgery among those with EGC showing high-risk histological features.
+%G eng
+%J American Journal of Cancer Research
+%A Sung, You-Na
+%A Lee, Hyeseong
+%A Kim, Eunsu
+%A Jung, Woon Yong
+%A Sohn, Jin-Hee
+%A Lee, Yoo Jin
+%A Keum, Bora
+%A Ahn, Sangjeong
+%A Lee, Sung Hak
+%D 2024
+%K deep learning
+computational pathology
+endoscopic resection
+Gastric cancer
+lymph node metastasis
+machine learning
+
+%0 Web Page
+%T [PDF] Estimation of Abnormal Cell Growth and MCG-Based Discriminative Feature Analysis of Histopathological Breast Images | Semantic Scholar
+%U https://www.semanticscholar.org/paper/Estimation-of-Abnormal-Cell-Growth-and-MCG-Based-of-Saha-Das/d6390a4d003aa5e374f6560512357f7a6202cd76
+
+%0 Journal Article
+%T A machine learning-based model to predict POD24 in follicular lymphoma: a study by the Chinese workshop on follicular lymphoma
+%V 13
+%N 1
+%P 2
+%U https://biomarkerres.biomedcentral.com/articles/10.1186/s40364-024-00716-4
+%X Abstract
+            
+              Background
+              Disease progression within 24 months (POD24) significantly impacts overall survival (OS) in patients with follicular lymphoma (FL). This study aimed to develop a robust predictive model, FLIPI-C, using a machine learning approach to identify FL patients at high risk of POD24.
+            
+            
+              Methods
+              A cohort of 1,938 FL patients (FL1-3a) from seventeen centers nationwide in China was randomly divided into training and internal validation sets (2:1 ratio). XGBoost was utilized to construct the POD24-predicting model, which was internally validated in the validation set and externally validated in the GALLIUM cohort. Key predictors of POD24 included lymphocyte-to-monocyte ratio (LMR), lactate dehydrogenase (LDH) > ULN, low hemoglobin (Hb), elevated beta-2 microglobulin (β2-MG), maximum standardized uptake value (SUVmax), and lymph node involvement. The FLIPI-C model assigned 2 points to LMR and 1 point to each of the other variables.
+            
+            
+              Results
+              The FLIPI-C model demonstrated superior accuracy (AUC) for predicting POD24 and 3-year overall survival (OS) in both the internal (AUC POD24: 0.764, OS: 0.700) and external validation cohorts (AUC POD24: 0.703, OS: 0.653), compared to existing models (FLIPI, FLIPI-2, PRIMA-PI, FLEX). Decision curve analysis confirmed the superior net benefits of FLIPI-C.
+            
+            
+              Conclusions
+              Developed using a machine learning approach, the FLIPI-C model offers superior predictive accuracy and utilizes simple, widely available markers. It holds promise for informing treatment decisions and prognostic assessments in clinical practice for FL patients at high risk of POD24.
+%G en
+%J Biomarker Research
+%A Zha, Jie
+%A Chen, Qinwei
+%A Zhang, Wei
+%A Jing, Hongmei
+%A Ye, Jingjing
+%A Liu, Huanhuan
+%A Yu, Haifeng
+%A Yi, Shuhua
+%A Li, Caixia
+%A Zheng, Zhong
+%A Xu, Wei
+%A Li, Zhifeng
+%A Lin, Zhijuan
+%A Ping, Lingyan
+%A He, Xiaohua
+%A Zhang, Liling
+%A Xie, Ying
+%A Chen, Feili
+%A Sun, Xiuhua
+%A Su, Liping
+%A Zhang, Huilai
+%A Yang, Haiyan
+%A Zhao, Weili
+%A Qiu, Lugui
+%A Li, Zhiming
+%A Song, Yuqin
+%A Xu, Bing
+%D 2025-01-03
+
+%0 Journal Article
+%T Cluster-First Labelling: An Automated Pipeline for Segmentation and Morphological Clustering in Histology Whole Slide Images
+%I arXiv
+%* Creative Commons Attribution 4.0 International
+%U https://arxiv.org/abs/2604.09370
+%X Labelling tissue components in histology whole slide images (WSIs) is prohibitively labour-intensive: a single slide may contain tens of thousands of structures--cells, nuclei, and other morphologically distinct objects--each requiring manual boundary delineation and classification. We present a cloudnative, end-to-end pipeline that automates this process through a cluster-first paradigm. Our system tiles WSIs, filters out tiles deemed unlikely to contain valuable information, segments tissue components with Cellpose-SAM (including cells, nuclei, and other morphologically similar structures), extracts neural embeddings via a pretrained ResNet-50, reduces dimensionality with UMAP, and groups morphologically similar objects using DBSCAN clustering. Under this paradigm, a human annotator labels representative clusters rather than individual objects, reducing annotation effort by orders of magnitude. We evaluate the pipeline on 3,696 tissue components across 13 diverse tissue types from three species (human, rat, rabbit), measuring how well unsupervised clusters align with independent human labels via per-tile Hungarian-algorithm matching. Our system achieves a weighted cluster-label alignment accuracy of 96.8%, with 7 of 13 tissue types reaching perfect agreement. The pipeline, a companion labelling web application, and all evaluation code are released as open-source software.
+%A Ahmad, Muhammad Haseeb
+%A Rajendran, Sharmila
+%A Young, Damion
+%A Mason, Jon
+%D 2026
+%K Computer Vision and Pattern Recognition (cs.CV)
+FOS: Biological sciences
+FOS: Computer and information sciences
+Quantitative Methods (q-bio.QM)
+
+%0 Journal Article
+%T The pathobiology of follicular lymphoma
+%V 63
+%N 3
+%P 152-163
+%X Follicular lymphoma is one of the most frequent lymphomas. Histologically, it is characterized by a follicular (nodular) growth pattern of centrocytes and centroblasts; mixed with variable immune microenvironment cells. Clinically, it is characterized by diffuse lymphadenopathy, bone marrow involvement, and splenomegaly. It is biologically and clinically heterogeneous. In most patients it is indolent, but others have a more aggressive evolution with relapses; and transformation to diffuse large B-cell lymphoma. Tumorigenesis includes an asymptomatic preclinical phase in which premalignant B-lymphocytes with the t(14;18) chromosomal translocation acquire additional genetic alterations in the germinal centers, and clonal evolution occurs, although not all the cells progress to the tumor stage. This manuscript reviews the pathobiology and clinicopathological characteristics of follicular lymphoma. It includes a description of the physiology of the germinal center, the genetic alterations of BCL2 and BCL6, the mutational profile, the immune checkpoint, precision medicine, and highlights in the lymphoma classification. In addition, a comment and review on artificial intelligence and machine (deep) learning are made.
+%G eng
+%J Journal of clinical and experimental hematopathology: JCEH
+%A Carreras, Joaquim
+%D 2023-09-28
+%K follicular lymphoma
+Artificial Intelligence
+Humans
+Lymphoma, Follicular
+B-Lymphocytes
+Lymphoma, Large B-Cell, Diffuse
+mutational profile
+Neoplasm Recurrence, Local
+pathobiology
+pathogenesis
+prognosis
+Translocation, Genetic
+Tumor Microenvironment
+
+%0 Journal Article
+%T The heterogeneity of follicular lymphomas: from early development to transformation
+%V 468
+%N 2
+%P 127-139
+%X Follicular lymphoma (FL) is a lymphoma composed of germinal center B cells, i.e., centroblasts and centrocytes, that almost always show at least a focal follicular growth pattern. Most cases have a characteristic CD5-, CD10+, BCL6+, and BCL2+ immunophenotype, and 85 % of cases exhibit the hallmark translocation t(14;18)(q32;q21) involving BCL2 and IGH. Although the typical clinicopathological findings of FL are well recognized, cases with unusual clinical, morphologic, immunophenotypic, and genetic features may pose problems in diagnosis and nomenclature. In the slide workshop organized by the European Association for Haematopathology (EAHP) and the Society for Hematopathology (SH) held in Istanbul, Turkey, unusual variants of FL were discussed based on the submitted cases, including early lesions, localized extranodal presentation, uncommon immunophenotype, rare genetic alterations, diffuse variant, and marginal zone differentiation. Interesting features such as blastoid morphology and unusual progression forms were presented, aiming to understand the genetic basis of transformation. In this report, novel findings and diagnostic challenges emerging from the submitted cases will be highlighted, and new terminologies for some of these lesions are proposed.
+%G eng
+%J Virchows Archiv: An International Journal of Pathology
+%A Xerri, Luc
+%A Dirnhofer, Stephan
+%A Quintanilla-Martinez, Leticia
+%A Sander, Birgitta
+%A Chan, John K. C.
+%A Campo, Elias
+%A Swerdlow, Steven H.
+%A Ott, German
+%D 2016-02
+%K Humans
+Lymphoma, Follicular
+B-Lymphocytes
+Translocation, Genetic
+Animals
+BCL2
+Biomarkers, Tumor
+Classification
+Cytogenetics
+Follicular lymphoma
+Immunohistochemistry
+Immunophenotyping
+
+%0 Journal Article
+%T A general framework for the segmentation of follicular lymphoma virtual slides
+%V 36
+%N 6
+%P 442-451
+%X Follicular lymphoma (FL) is one of the most common types of non-Hodgkin's lmphomas in the world. Diagnosis of FL is based on morphological and immunohistochemical characteristics found on tissue sections. Our project's aim is to develop computer-aided analysis tools on virtual slide images (VSI) of lymphoid tissues with the purpose of improving the FL grading performed in malignant follicles. In this paper, we focus on the first step of our work, an automated system for detecting follicles in VSI of lymphoid tissues. To mimic the human expert process, the system works on low-resolution CD20 images and maps the follicle boundaries on high-resolution H&E images.
+%G eng
+%J Computerized Medical Imaging and Graphics: The Official Journal of the Computerized Medical Imaging Society
+%A Oger, Myriam
+%A Belhomme, Philippe
+%A Gurcan, Metin N.
+%D 2012-09
+%K Humans
+Lymphoma, Follicular
+Algorithms
+Biopsy
+Image Enhancement
+Image Interpretation, Computer-Assisted
+Microscopy
+Pattern Recognition, Automated
+Reproducibility of Results
+Sensitivity and Specificity
+User-Computer Interface
+
+%0 Journal Article
+%T Classification of follicular lymphoma images: a holistic approach with symbol-based machine learning methods
+%V 123
+%N 23-24
+%P 700-709
+%X It is not very often to see a symbol-based machine learning approach to be used for the purpose of image classification and recognition. In this paper we will present such an approach, which we first used on the follicular lymphoma images. Lymphoma is a broad term encompassing a variety of cancers of the lymphatic system. Lymphoma is differentiated by the type of cell that multiplies and how the cancer presents itself. It is very important to get an exact diagnosis regarding lymphoma and to determine the treatments that will be most effective for the patient's condition. Our work was focused on the identification of lymphomas by finding follicles in microscopy images provided by the Laboratory of Pathology in the University Hospital of Tenerife, Spain. We divided our work in two stages: in the first stage we did image pre-processing and feature extraction, and in the second stage we used different symbolic machine learning approaches for pixel classification. Symbolic machine learning approaches are often neglected when looking for image analysis tools. They are not only known for a very appropriate knowledge representation, but also claimed to lack computational power. The results we got are very promising and show that symbolic approaches can be successful in image analysis applications.
+%G eng
+%J Wiener Klinische Wochenschrift
+%A Zorman, Milan
+%A Sánchez de la Rosa, José Luis
+%A Dinevski, Dejan
+%D 2011-12
+%K Artificial Intelligence
+Humans
+Lymphoma, Follicular
+Algorithms
+Image Enhancement
+Image Interpretation, Computer-Assisted
+Pattern Recognition, Automated
+Reproducibility of Results
+Sensitivity and Specificity
+Holistic Health
+Signal Processing, Computer-Assisted
+
+%0 Journal Article
+%T Research on the classification of lymphoma pathological images based on deep residual neural network
+%V 29
+%N S1
+%P 335-344
+%X BACKGROUND: Malignant lymphoma is a type of tumor that originated from the lymphohematopoietic system, with complex etiology, diverse pathological morphology, and classification. It takes a lot of time and energy for doctors to accurately determine the type of lymphoma by observing pathological images.
+OBJECTIVE: At present, an automatic classification technology is urgently needed to assist doctors in analyzing the type of lymphoma.
+METHODS: In this paper, by comparing the training results of the BP neural network and BP neural network optimized by genetic algorithm (GA-BP), adopts a deep residual neural network model (ResNet-50), with 374 lymphoma pathology images as the experimental data set. After preprocessing the dataset by image flipping, color transformation, and other data enhancement methods, the data set is input into the ResNet-50 network model, and finally classified by the softmax layer.
+RESULTS: The training results showed that the classification accuracy was 98.63%. By comparing the classification effect of GA-BP and BP neural network, the accuracy of the network model proposed in this paper is improved.
+CONCLUSIONS: The network model can provide an objective basis for doctors to diagnose lymphoma types.
+%G eng
+%J Technology and Health Care: Official Journal of the European Society for Engineering and Medicine
+%A Zhang, Xiaoli
+%A Zhang, Kuixing
+%A Jiang, Mei
+%A Yang, Lin
+%D 2021
+%K deep learning
+Humans
+automatic classification
+Disease Progression
+Lymphoma
+Neural Networks, Computer
+pathological images
+Physicians
+Resnet-50
+
+%0 Journal Article
+%T Classification of digital pathological images of non-Hodgkin's lymphoma subtypes based on the fusion of transfer learning and principal component analysis
+%V 47
+%N 9
+%P 4241-4253
+%X PURPOSE: Non-Hodgkin's lymphoma (NHL) is a serious malignant disease. Delayed diagnosis will cause anemia, increased intracranial pressure, organ failure, and even lead to death. The current main trend in this area is to use deep learning (DL) for disease diagnosis. Extracting classification information from the digital pathology images by DL may realize the automated qualitative and quantitative analysis of NHL. Previously, DL has been used to classify NHL digital pathology images with some success. However, shortcomings still exist in the data preprocessing methods and feature extraction. Therefore, this paper presents a method for the classification of NHL subtypes based on the fusion of transfer learning (TL) and principal component analysis (PCA).
+METHODS: First, the NHL digital pathology images were preprocessed by image division and segmentation and then input into the transfer models for fine-tuning and feature extraction. Second, PCA was used to map the extracted features. Finally, a neural network was used as a classifier to classify the mapped features. During the fine-tuning of the transfer models, two methods, freezing all feature extraction layers and fine-tuning all layers, were employed to select the optimal model with the best classification result among all the preselected transfer models. On this basis, the use of freezing the layers' location was discussed and analyzed.
+RESULTS: The results show that the proposed method achieved average fivefold cross-validation accuracies of 100%, 99.73%, and 99.20% for chronic lymphocytic leukemia (CLL), follicular lymphoma (FL), and mantle cell lymphoma (MCL) tumor, and each category has standard deviations 0.00, 0.53, and 0.65, respectively, in the NHL reference dataset. The overall classification accuracy for fivefold cross-validation is 98.93%, which is an increase of 1.26% compared to the latest reported methods, having a lower standard deviation (1.00).
+CONCLUSION: The method proposed in this paper achieves a high classification accuracy and strong model generalization for the classification of NHL, which makes it possible to conduct intelligent classification of NHL in clinical practice. Our proposed method has definite clinical value and research significance.
+%G eng
+%J Medical Physics
+%A Zhang, Jianfei
+%A Cui, Wensheng
+%A Guo, Xiaoyan
+%A Wang, Bo
+%A Wang, Zhen
+%D 2020-09
+%K Adult
+Humans
+Neural Networks, Computer
+computer-aided diagnosis (CAD)
+deep learning algorithm
+lymphoma
+Lymphoma, Non-Hodgkin
+Machine Learning
+Principal Component Analysis
+principal component analysis (PCA)
+transfer learning (TL)
+
+%0 Book Section
+%T Cell Detection with Star-convex Polygons
+%V 11071
+%P 265-273
+%U http://arxiv.org/abs/1806.03535
+%X Automatic detection and segmentation of cells and nuclei in microscopy images is important for many biological applications. Recent successful learning-based approaches include per-pixel cell segmentation with subsequent pixel grouping, or localization of bounding boxes with subsequent shape refinement. In situations of crowded cells, these can be prone to segmentation errors, such as falsely merging bordering cells or suppressing valid cell instances due to the poor approximation with bounding boxes. To overcome these issues, we propose to localize cell nuclei via star-convex polygons, which are a much better shape representation as compared to bounding boxes and thus do not need shape refinement. To that end, we train a convolutional neural network that predicts for every pixel a polygon for the cell instance at that position. We demonstrate the merits of our approach on two synthetic datasets and one challenging dataset of diverse fluorescence microscopy images.
+%A Schmidt, Uwe
+%A Weigert, Martin
+%A Broaddus, Coleman
+%A Myers, Gene
+%D 2018
+%K Computer Science - Computer Vision and Pattern Recognition
+
+%0 Conference Paper
+%T A method for normalizing histology slides for quantitative analysis
+%P 1107-1110
+%U https://ieeexplore.ieee.org/document/5193250
+%X Inconsistencies in the preparation of histology slides make it difficult to perform quantitative analysis on their results. In this paper we provide two mechanisms for overcoming many of the known inconsistencies in the staining process, thereby bringing slides that were processed or stored under very different conditions into a common, normalized space to enable improved quantitative analysis.
+%B 2009 IEEE International Symposium on Biomedical Imaging: From Nano to Macro
+%A Macenko, Marc
+%A Niethammer, Marc
+%A Marron, J. S.
+%A Borland, David
+%A Woosley, John T.
+%A Guan, Xiaojun
+%A Schmitt, Charles
+%A Thomas, Nancy E.
+%D 2009-06
+%K Biological cells
+Biomedical image processing
+Biomedical microscopy
+Biomedical signal detection
+Deconvolution
+Detectors
+Diffraction
+Fluorescence
+Image retrieval
+Information retrieval
+Maximum likelihood estimation
+Melanoma
+Microscopy
+Pathology
+Testing
+

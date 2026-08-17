@@ -1,0 +1,13 @@
+# Temporary files & zips
+colab_benchmark.zip
+~$*.docx
+*.tmp
+*.log
+__pycache__/
+*.pyc
+
+# PyTorch / IDE / System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

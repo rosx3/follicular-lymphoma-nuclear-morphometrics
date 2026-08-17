@@ -1,0 +1,71 @@
+{
+  "version": "2.0",
+  "fixes_applied": [
+    "FIX1: rgb_normalized ora e denoised_rgb (coerente con h_channel)",
+    "FIX2: reference image selezionata automaticamente dalla mediana del dataset",
+    "FIX3: SVD deduplicata in metodo privato _estimate_HE_vectors",
+    "FIX4: rimosso import inutile matplotlib"
+  ],
+  "pipeline_steps": [
+    "1. Macenko Stain Normalization",
+    "2. Bilateral Denoising (d=9, sigmaColor=75, sigmaSpace=75)",
+    "3. Ruifrok Color Deconvolution + CLAHE (clipLimit=2.0, tileGrid=8x8)"
+  ],
+  "calibration": {
+    "microns_per_pixel": 0.23,
+    "patch_size_px": 224,
+    "patch_size_um": 51.52,
+    "patch_area_um2": 2654.3104000000003
+  },
+  "macenko_params": {
+    "Io": 255,
+    "alpha": 1,
+    "beta": 0.15,
+    "HERef": [
+      [
+        0.6222600102250522,
+        0.3163063847163023
+      ],
+      [
+        0.6969809800917748,
+        0.9216657552637808
+      ],
+      [
+        0.356384613956645,
+        0.22468312478187344
+      ]
+    ],
+    "maxCRef": [
+      0.9018956972828198,
+      1.5348738894254084
+    ]
+  },
+  "reference_image": {
+    "reference_image": "c:\\Users\\Master\\Desktop\\testNuovoTesi\\data\\raw\\reactive_tissue\\REACTIVE_examples (133).jpg",
+    "reference_image_basename": "REACTIVE_examples (133).jpg",
+    "distance_from_dataset_median": 1.0818875780438904,
+    "dataset_median_bgr": [
+      213.18727080676018,
+      162.24263592155614,
+      205.3440489477041
+    ],
+    "n_images_evaluated": 600
+  },
+  "bilateral_filter": {
+    "d": 9,
+    "sigma_color": 75,
+    "sigma_space": 75
+  },
+  "clahe": {
+    "clip_limit": 2.0,
+    "tile_grid_size": [
+      8,
+      8
+    ]
+  },
+  "n_images_processed": 600,
+  "output_structure": {
+    "rgb_normalized": "Macenko + Bilateral Filter — RGB 224x224x3 uint8",
+    "h_channel": "Macenko + Bilateral + Ruifrok + CLAHE — grayscale 224x224 uint8"
+  }
+}
