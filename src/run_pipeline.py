@@ -36,8 +36,6 @@ Output generati:
 
 import argparse
 import csv
-import json
-import os
 import time
 from pathlib import Path
 
@@ -45,15 +43,9 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-# Importa i moduli della pipeline (importazione dinamica per gestire i prefissi numerici 01_ e 02_)
 import importlib.util
 
 _SRC_DIR = Path(__file__).resolve().parent
-
-# Modulo 01: Preprocessing
-_spec_prep = importlib.util.spec_from_file_location("mod_preprocessing", _SRC_DIR / "01_preprocessing.py")
-_mod_prep = importlib.util.module_from_spec(_spec_prep)
-_spec_prep.loader.exec_module(_mod_prep)
 
 # Modulo 01: Preprocessing
 _spec_prep = importlib.util.spec_from_file_location("mod_preprocessing", _SRC_DIR / "01_preprocessing.py")
@@ -241,7 +233,7 @@ def run_fase2(verbose: bool = True) -> None:
                     all_centroids.append({
                         "image_name":       h_path.stem,
                         "category":         cat_name,
-                        "nucleus_id":       c["nucleus_id"],
+                        "nucleus_id":       c["id"],
                         "centroid_x_px":    c["centroid_x_px"],
                         "centroid_y_px":    c["centroid_y_px"],
                         "centroid_x_um":    round(c["centroid_x_px"] * 0.23, 3),

@@ -2,7 +2,7 @@
 ===============================================================================
 Modulo 02: Segmentazione dei Nuclei Cellulari & Estrazione Centroidi
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Reattivo
-Versione: 3.0 — Audit & Fix (agosto 2026)
+Versione: 4.0 — Audit & Fix (agosto 2026)
 ===============================================================================
 Questo modulo gestisce:
  1. Segmentazione d'istanza dei nuclei con Marker-Controlled Watershed +

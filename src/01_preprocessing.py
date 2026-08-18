@@ -174,7 +174,7 @@ class StainNormalizerMacenko:
         di chiamare transform() su tutte le altre immagini.
         """
         img_flat = img_rgb.astype(np.float64).reshape((-1, 3))
-        OD       = -np.log10((img_flat + 1) / self.Io)
+        OD       = -np.log10((img_flat + 1.0) / (self.Io + 1.0))  # +1/+1 garantisce OD ≥ 0
 
         self.HERef = self._estimate_HE_vectors(OD)
 
@@ -197,7 +197,7 @@ class StainNormalizerMacenko:
         """
         h, w, _ = img_rgb.shape
         img_flat = img_rgb.astype(np.float64).reshape((-1, 3))
-        OD       = -np.log10((img_flat + 1) / self.Io)
+        OD       = -np.log10((img_flat + 1.0) / (self.Io + 1.0))  # +1/+1 garantisce OD ≥ 0
 
         # Stima vettori H/E della patch sorgente
         HE_src = self._estimate_HE_vectors(OD)
