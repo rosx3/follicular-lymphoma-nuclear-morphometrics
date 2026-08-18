@@ -1,0 +1,11 @@
+image_name,category,gt_source,ws_dice,ws_iou,ws_aji,ws_f1_det,ws_precision_det,ws_recall_det,ws_n_pred,gt_n_nuclei,un_dice,un_iou,un_aji,un_f1_det,un_precision_det,un_recall_det,un_n_pred
+FL_examples (253),Follicular Lymphoma,Cellpose_nuclei_v4,0.6176,0.4468,0.3087,0.2979,0.4242,0.2295,66,122,0.6633,0.4962,0.3241,0.3141,0.4348,0.2459,69
+FL_examples (16),Follicular Lymphoma,Cellpose_nuclei_v4,0.5668,0.3955,0.2948,0.381,0.7385,0.2567,65,187,0.6445,0.4754,0.3111,0.3721,0.6761,0.2567,71
+FL_examples (11),Follicular Lymphoma,Cellpose_nuclei_v4,0.7347,0.5806,0.3576,0.4603,0.725,0.3372,80,172,0.761,0.6142,0.3864,0.4627,0.7108,0.343,83
+FL_examples (108),Follicular Lymphoma,Cellpose_nuclei_v4,0.509,0.3414,0.2961,0.375,0.6522,0.2632,69,171,0.517,0.3487,0.297,0.4,0.7344,0.2749,64
+FL_examples (249),Follicular Lymphoma,Cellpose_nuclei_v4,0.7033,0.5424,0.3943,0.5,0.6667,0.4,27,45,0.7485,0.5981,0.4198,0.5205,0.6786,0.4222,28
+REACTIVE_examples (232),Reactive Tissue,Cellpose_nuclei_v4,0.5266,0.3574,0.3117,0.381,0.5882,0.2817,34,71,0.5667,0.3953,0.3374,0.4762,0.7353,0.3521,34
+REACTIVE_examples (244),Reactive Tissue,Cellpose_nuclei_v4,0.6334,0.4635,0.3378,0.4321,0.775,0.2995,80,207,0.7889,0.6513,0.3388,0.392,0.6277,0.285,94
+REACTIVE_examples (85),Reactive Tissue,Cellpose_nuclei_v4,0.5459,0.3754,0.2969,0.3707,0.7164,0.25,67,192,0.6475,0.4787,0.3203,0.3383,0.6081,0.2344,74
+REACTIVE_examples (215),Reactive Tissue,Cellpose_nuclei_v4,0.7242,0.5677,0.3812,0.4502,0.7027,0.3312,74,157,0.7513,0.6017,0.3764,0.4643,0.7761,0.3312,67
+REACTIVE_examples (18),Reactive Tissue,Cellpose_nuclei_v4,0.7078,0.5478,0.3325,0.4444,0.72,0.3214,75,168,0.8073,0.6768,0.3701,0.4701,0.7108,0.3512,83

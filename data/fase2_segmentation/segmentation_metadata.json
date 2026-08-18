@@ -1,0 +1,41 @@
+{
+  "version": "3.0",
+  "fase": "Fase 2 — Segmentazione Nuclei ed Estrazione Centroidi (Benchmark Indipendente)",
+  "total_dataset_images": 600,
+  "total_nuclei_segmented": 94042,
+  "follicular_lymphoma": {
+    "n_images": 300,
+    "total_nuclei": 44749,
+    "mean_nuclei_per_patch": 149.2
+  },
+  "reactive_tissue": {
+    "n_images": 300,
+    "total_nuclei": 49293,
+    "mean_nuclei_per_patch": 164.3
+  },
+  "validation_benchmark_independent_cellpose": {
+    "gt_source": "Cellpose v4.x CellposeModel(nuclei, diameter=22.0px)",
+    "n_val_patches": 10,
+    "watershed_zero_shot": {
+      "dice_coefficient_mean": 0.6373,
+      "dice_coefficient_std": 0.1091,
+      "iou_jaccard_mean": 0.4763,
+      "aji_instance_mean": 0.3255,
+      "f1_detection_mean": 0.4101
+    },
+    "pytorch_unet_resnet34": {
+      "dice_coefficient_mean": 0.5738,
+      "dice_coefficient_std": 0.1260,
+      "iou_jaccard_mean": 0.4124,
+      "aji_instance_mean": 0.2873,
+      "f1_detection_mean": 0.3508
+    }
+  },
+  "output_files": {
+    "masks": "data/fase2_segmentation/*/masks/",
+    "overlays": "data/fase2_segmentation/*/overlays/",
+    "centroids_csv": "data/fase2_segmentation/centroids_all.csv",
+    "colab_benchmark_csv": "data/fase2_segmentation/colab_benchmark_results.csv",
+    "model_weights": "data/fase2_segmentation/unet_resnet34_weights.pth"
+  }
+}
