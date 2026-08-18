@@ -1,6 +1,7 @@
 # Report Fase 1 — Preprocessing delle Immagini Istologiche H&E
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
-*Modulo: [`src/01_preprocessing.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/01_preprocessing.py) — Versione 2.0*
+*Modulo: [`src/01_preprocessing.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/01_preprocessing.py) — Versione 3.0*  
+*Aggiornato il 18 agosto 2026 — Audit globale del progetto*
 
 ---
 
@@ -52,7 +53,9 @@ Immagine Raw RGB (224×224 px)
 ### 1. Normalizzazione di Macenko vs. Reinhard
 * **Scelta:** Normalizzazione cromatica di Macenko in Densità Ottica (OD).
 * **Riferimento:** **Macenko et al. (2009)** — *IEEE ISBI*, pp. 1107-1110.
-* **Motivazione Scientifica:** A differenza dei metodi di allineamento statistico nello spazio colore LAB (Reinhard), l'algoritmo di Macenko converte l'immagine in Densità Ottica ($OD = -\log_{10}(I/255)$) ed applica la Decomposizione ai Valori Singoli (**SVD**) per stimare i reali vettori spettrali di assorbimento dell'Ematossilina e dell'Eosina. Questo rispetta la fisica dell'interazione luce-colorante regolata dalla legge di Beer-Lambert (*Macenko et al., 2009*).
+* **Motivazione Scientifica:** A differenza dei metodi di allineamento statistico nello spazio colore LAB (Reinhard), l'algoritmo di Macenko converte l'immagine in Densità Ottica ($OD = -\log_{10}((I+1)/256)$) ed applica la Decomposizione ai Valori Singoli (**SVD**) per stimare i reali vettori spettrali di assorbimento dell'Ematossilina e dell'Eosina. Questo rispetta la fisica dell'interazione luce-colorante regolata dalla legge di Beer-Lambert (*Macenko et al., 2009*).
+
+  > **Nota Implementativa (v3.0):** La formula OD utilizza il divisore $256$ anziché $255$ affinché un pixel di intensità massima ($I=255$) produca $OD = -\log_{10}(256/256) = 0$, eliminando il rischio di valori OD fisicamente impossibili (negativi). L'offset $+1$ al numeratore garantisce che $I=0$ (assorbimento totale) non produca $\log(0)$.
 
 ### 2. Filtro Bilaterale vs. Filtro Gaussiano
 * **Scelta:** Filtro Bilaterale con kernel $d=9$, $\sigma_{\text{color}}=75$, $\sigma_{\text{space}}=75$.
@@ -73,6 +76,17 @@ Immagine Raw RGB (224×224 px)
 | 🔴 **FIX 2** | Reference image selezionata da mediana del dataset (`REACTIVE_examples (133).jpg`) | Evita distorsioni cromatiche derivanti dall'uso arbitrario della prima immagine alfabetica (distanza dalla mediana ridotta da 10.06 a 1.08) |
 | 🟡 **FIX 3** | Refactoring SVD in `_estimate_HE_vectors()` | Principi di ingegneria del software DRY (Don't Repeat Yourself) |
 | 🟡 **FIX 4** | Salvataggio `preprocessing_metadata.json` | Principi FAIR e riproducibilità scientifica della ricerca |
+
+---
+
+## Fix Applicati dopo Audit v2 → v3 (18 agosto 2026)
+
+| Fix | File | Riga | Descrizione | Impatto |
+|-----|------|------|-------------|---------|
+| 🔴 **FIX 5** | `src/01_preprocessing.py` | ~293 | **Correzione formula OD:** `/ 255.0` → `/ 256.0` | Elimina il rischio di valori OD fisicamente negativi per pixel a intensità massima ($I=255$). Con $/ 255.0$, il valore $(255+1)/255 = 1.0039$ produceva $OD = -0.0017$, una violazione della legge di Beer-Lambert. Con $/ 256.0$, il valore $(255+1)/256 = 1.0$ produce $OD = 0.0$, fisicamente corretto (assorbimento nullo). |
+| 🟢 **FIX 6** | `src/run_pipeline.py` | (nuovo file) | **Creato script di orchestrazione** `run_pipeline.py` come entry point principale | Gli script `01_preprocessing.py` e `02_segmentation.py` contenevano solo self-test interni. Il README dichiarava di eseguirli per processare il dataset, ma questo non accadeva. Il nuovo `run_pipeline.py` itera sulle 600 immagini reali con barre di progresso e gestione degli errori. |
+| 🟢 **FIX 7** | `requirements.txt` | (nuovo file) | **Creato `requirements.txt`** con versioni pinned di tutte le dipendenze Python | Riproducibilità dell'ambiente: `numpy`, `scipy`, `scikit-image`, `opencv-python`, `torch`, `torchvision`, `xgboost`, `shap`. |
+| 🟢 **FIX 8** | `.gitignore` | — | **Aggiornato `.gitignore`** con regole per `*.pth`, `venv/`, `.ipynb_checkpoints/`, `*.zip` | I pesi PyTorch da 93 MB erano stati caricati su GitHub con un avviso di dimensione. La regola `*.pth` previene push futuri di file pesanti. |
 
 ---
 

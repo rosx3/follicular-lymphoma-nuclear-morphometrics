@@ -1,7 +1,7 @@
 # Report Finale — Fase 2: Segmentazione dei Nuclei Cellulari ed Estrazione Centroidi
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
-*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — versione 3.0*  
-*Generato il 17 agosto 2026*
+*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.0*  
+*Aggiornato il 18 agosto 2026 — Audit globale del progetto*
 
 ---
 
@@ -100,3 +100,38 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 8. **Xerri L, Dirnhofer S, Quintanilla-Martinez L, et al.** (2016). *The heterogeneity of follicular lymphomas: from early development to transformation*. **Virchows Archiv**, 468(2), 127-139. DOI: 10.1007/s00428-015-1864-y.
 9. **Carreras J.** (2023). *The pathobiology of follicular lymphoma*. **Journal of Clinical and Experimental Hematopathology (JCEH)**, 63(3), 152-163. DOI: 10.3960/jslrt.23023.
 10. **Ronneberger O, Fischer P, Brox T.** (2015). *U-Net: Convolutional Networks for Biomedical Image Segmentation*. **MICCAI 2015**, LNCS 9351, pp. 234-241.
+
+---
+
+## 6. Fix Applicati dopo Audit v3 → v4 (18 agosto 2026)
+
+| Fix | File | Riga | Descrizione | Impatto |
+|-----|------|------|-------------|---------|
+| 🔴 **FIX A** | `src/02_segmentation.py` | ~373 | **Correzione bug AJI (accoppiamento non univoco):** aggiunto `if pred_id in matched_pred_ids: continue` nel ciclo interno di `_compute_aji()` | Prima della correzione, un singolo nucleo predetto poteva essere selezionato come *best match* per più nuclei GT diversi, violando la definizione formale di *Kumar et al. (2017)*: "ogni predizione viene accoppiata al massimo con un solo nucleo GT". Il bug sopravvalutava leggermente l'intersezione totale. Dopo il fix, ogni nucleo predetto è assegnato in modo esclusivo al primo GT con cui raggiunge la massima IoU. |
+| 🟡 **FIX B** | `src/02_segmentation.py` | ~522 | **Documentazione data leakage nello split U-Net:** aggiornato il docstring di `split_gt_patches()` con avviso metodologico dettagliato | La funzione eseguiva uno split casuale a livello di patch. In presenza di WSI con più patch sovrapposte dello stesso paziente, questo produrrebbe un data leakage che inflazionerebbe le metriche di validazione della U-Net. Nel contesto specifico di questo dataset, il rischio è mitigato (cfr. Sezione 6.1). |
+
+---
+
+## 6.1 Analisi del Data Leakage nello Split Train/Val della U-Net
+
+### Descrizione del Problema
+
+La funzione `split_gt_patches()` divide le 30 patch di Ground Truth in un set di addestramento (20 patch) e uno di validazione (10 patch) campionando **casualmente a livello di patch**, non a livello di immagine sorgente (WSI). In un dataset tipico di patologia digitale, dove da una singola WSI (Whole Slide Image) di un paziente vengono estratte centinaia di patch sovrapposte, questo approccio produce un **data leakage**: patch visivamente simili, estratte dalla stessa regione dello stesso paziente, finiscono sia nel training che nel validation set, gonfiando artificialmente le metriche di validazione.
+
+### Valutazione nel Contesto Specifico di Questo Dataset
+
+Nel dataset Zenodo (*Carreras et al., 2025*, DOI: 10.5281/zenodo.15702609) utilizzato in questo progetto, **ciascuna delle 600 immagini JPEG costituisce una patch anatomicamente indipendente** estratta da acquisizioni diverse. Non esistono multiple patch estratte dalla stessa regione WSI dello stesso paziente. Di conseguenza:
+
+- Il rischio di data leakage in senso stretto **non è rilevante** in questo progetto specifico.
+- Lo split tra le 30 patch di Ground Truth (20 train + 10 val) avviene su campioni anatomicamente distinti.
+
+### Perché le Metriche U-Net Rimangono Comunque Conservative
+
+Indipendentemente dal data leakage, le metriche della U-Net restano **inferiori** a quelle del Watershed (Dice $57.4\%$ vs $63.7\%$) per due ragioni strutturali:
+
+1. **Pseudo-GT Circolare:** La Ground Truth delle 30 patch è generata algoritmicamente dallo stesso Watershed, dunque la U-Net impara a imitare un modello che la supera intrinsecamente.
+2. **Overfitting da Regime Small-Data:** 20 patch di training sono insufficienti per addestrare una rete convoluzionale su una distribuzione di 600 patch di test.
+
+### Dichiarazione da Inserire nella Tesi (Sezione Limitazioni)
+
+> *"Lo split train/val per la rete U-Net ResNet-34 è stato eseguito a livello di patch (20 train / 10 val). In un dataset con patch estratte da WSI dello stesso paziente, questo approccio potrebbe introdurre un data leakage che inflazionerebbe le metriche di validazione. Nel presente lavoro tale rischio è mitigato dal fatto che ciascuna immagine nel dataset Zenodo [DOI: 10.5281/zenodo.15702609] costituisce una patch anatomicamente indipendente proveniente da acquisizioni distinte. La valutazione definitiva delle due metodologie è stata condotta tramite un benchmark indipendente su GPU (Cellpose v4.x, Stringer et al., 2021), privo di qualsiasi forma di circolarità o leakage."*

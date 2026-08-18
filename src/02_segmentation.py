@@ -2,7 +2,7 @@
 ===============================================================================
 Modulo 02: Segmentazione dei Nuclei Cellulari & Estrazione Centroidi
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Reattivo
-Versione: 3.0 — Audit & Fix (agosto 2026)
+Versione: 4.0 — Audit & Fix (agosto 2026)
 ===============================================================================
 Questo modulo gestisce:
  1. Segmentazione d'istanza dei nuclei con Marker-Controlled Watershed +
@@ -371,6 +371,10 @@ def _compute_aji(mask_gt: np.ndarray, mask_pred: np.ndarray) -> float:
         best_pid = None
 
         for pred_id in pred_ids:
+            # Bug fix (Kumar et al. 2017): ogni predetto può essere accoppiato
+            # al massimo con un solo nucleo GT — accoppiamento univoco 1-a-1.
+            if pred_id in matched_pred_ids:
+                continue
             pred_mask = (mask_pred == pred_id)
             inter = int(np.logical_and(gt_mask, pred_mask).sum())
             if inter == 0:
@@ -523,9 +527,14 @@ def split_gt_patches(gt_patch_paths: list, val_fraction: float = 0.33, seed: int
     Divide le patch di Ground Truth (pseudo-GT) in train e val set
     mantenendo la stratificazione per categoria (FL / Reactive).
 
-    NOTA: questo split non risolve la circolarità della validazione
-    (la pseudo-GT è sempre generata algoritmicamente), ma garantisce almeno
-    che la U-Net NON venga valutata sulle stesse immagini su cui è addestrata.
+    NOTA METODOLOGICA (data leakage): questo split avviene a livello di patch,
+    non a livello di immagine sorgente (WSI). Poiché più patch provengono dalla
+    stessa immagine, patch visivamente simili (stesso paziente/acquisizione)
+    possono finire sia nel train che nel val, producendo una sovrastima delle
+    metriche di validazione della U-Net. Questo è accettabile in questo contesto
+    dato che la valutazione finale avviene tramite Cellpose come GT indipendente
+    (cfr. benchmark Colab), ma va segnalato come limitazione nella tesi.
+    In produzione, usare GroupKFold suddividendo per nome dell'immagine sorgente.
 
     Args:
         gt_patch_paths (list[tuple]): Lista di (path_img, path_mask, categoria).
