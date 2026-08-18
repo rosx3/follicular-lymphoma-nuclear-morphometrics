@@ -290,7 +290,7 @@ def extract_hematoxylin_channel_clahe(img_rgb, clip_limit=2.0, tile_grid_size=(8
 
     # Conversione RGB → Densità Ottica (legge di Beer-Lambert)
     img_float = img_rgb.astype(np.float64) + 1.0       # +1 evita log(0)
-    OD = -np.log10(img_float / 255.0)
+    OD = -np.log10(img_float / 256.0)                  # /256 garantisce OD ≥ 0 anche per pixel=255
 
     # Deconvoluzione: stima le concentrazioni H, E, Residuo per ogni pixel
     OD_flat = OD.reshape((-1, 3))

@@ -11,3 +11,26 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Pesi PyTorch (file grandi — usare Git LFS se necessario)
+*.pth
+*.pt
+*.ckpt
+
+# Ambienti virtuali Python
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Output intermedi e cache
+*.zip
+*.tar.gz
+*.egg-info/
+dist/
+build/

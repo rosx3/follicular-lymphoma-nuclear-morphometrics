@@ -68,12 +68,14 @@ testNuovoTesi/
 │   └── fase2_report.md                    # Auditing, Metriche AJI/F1 e Benchmark Segmentazione
 │
 ├── src/                                   # Codice sorgente modulare Python
+│   ├── run_pipeline.py                    # ⭐ Entry point principale — esegue l'intera pipeline
 │   ├── 01_preprocessing.py                # Pipeline Macenko + Deconvoluzione H-channel
 │   ├── 02_segmentation.py                 # Marker-Controlled Watershed v3.0 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   └── 04_classification.py               # Machine Learning Tabulare & XAI (SHAP)
 │
 ├── Biblioteca personale.txt               # Riferimenti bibliografici accademici
+├── requirements.txt                       # Dipendenze Python con versioni pinned
 └── README.md                              # Documentazione principale della repository
 ```
 
@@ -103,14 +105,19 @@ testNuovoTesi/
 - **Librerie Principali:** `opencv-python`, `scikit-image`, `scipy`, `numpy`, `torch`, `torchvision`, `matplotlib`
 
 ```bash
-# Clone o navigazione nella cartella
-cd testNuovoTesi
+# 1. Installare le dipendenze (prima esecuzione)
+pip install -r requirements.txt
 
-# Esecuzione Preprocessing (Fase 1)
-python src/01_preprocessing.py
+# 2. Eseguire l'intera pipeline (Fase 1 + Fase 2)
+python src/run_pipeline.py
 
-# Esecuzione Segmentazione Nuclei (Fase 2)
-python src/02_segmentation.py
+# Oppure, per eseguire solo una fase specifica:
+python src/run_pipeline.py --fase 1        # Solo Preprocessing
+python src/run_pipeline.py --fase 2        # Solo Segmentazione
+
+# I singoli moduli possono essere eseguiti per i self-test interni:
+python src/01_preprocessing.py            # [TEST] self-test modulo Preprocessing
+python src/02_segmentation.py             # [TEST] self-test modulo Segmentazione
 ```
 
 ---
