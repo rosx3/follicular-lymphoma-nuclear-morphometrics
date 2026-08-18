@@ -45,17 +45,33 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-# Importa i moduli della pipeline
-from src.preprocessinga import (   # noqa: E402  (import relativo)
-    find_best_reference_image,
-    MacenkoNormalizer,
-    process_single_image,
-)
-from src.segmentation import (    # noqa: E402
-    segment_nuclei_watershed,
-    extract_centroids,
-    draw_segmentation_overlay,
-)
+# Importa i moduli della pipeline (importazione dinamica per gestire i prefissi numerici 01_ e 02_)
+import importlib.util
+
+_SRC_DIR = Path(__file__).resolve().parent
+
+# Modulo 01: Preprocessing
+_spec_prep = importlib.util.spec_from_file_location("mod_preprocessing", _SRC_DIR / "01_preprocessing.py")
+_mod_prep = importlib.util.module_from_spec(_spec_prep)
+_spec_prep.loader.exec_module(_mod_prep)
+
+# Modulo 01: Preprocessing
+_spec_prep = importlib.util.spec_from_file_location("mod_preprocessing", _SRC_DIR / "01_preprocessing.py")
+_mod_prep = importlib.util.module_from_spec(_spec_prep)
+_spec_prep.loader.exec_module(_mod_prep)
+
+find_best_reference_image = _mod_prep.find_best_reference_image
+StainNormalizerMacenko    = _mod_prep.StainNormalizerMacenko
+process_single_image      = _mod_prep.process_single_image
+
+# Modulo 02: Segmentazione
+_spec_seg = importlib.util.spec_from_file_location("mod_segmentation", _SRC_DIR / "02_segmentation.py")
+_mod_seg = importlib.util.module_from_spec(_spec_seg)
+_spec_seg.loader.exec_module(_mod_seg)
+
+segment_nuclei_watershed  = _mod_seg.segment_nuclei_watershed
+draw_segmentation_overlay = _mod_seg.draw_segmentation_overlay
+
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -102,12 +118,12 @@ def run_fase1(verbose: bool = True) -> None:
     # Selezione automatica della Reference Image tra tutte le immagini
     if verbose:
         print("[Fase 1] Selezione automatica Reference Image...")
-    ref_path = find_best_reference_image([str(d) for d in raw_dirs])
+    ref_path, _ = find_best_reference_image([str(d) for d in raw_dirs])
     if verbose:
         print(f"[Fase 1] Reference Image: {ref_path}")
 
     # Inizializza il normalizzatore di Macenko
-    normalizer = MacenkoNormalizer()
+    normalizer = StainNormalizerMacenko()
     normalizer.fit(ref_path)
 
     # Contatori
@@ -132,10 +148,10 @@ def run_fase1(verbose: bool = True) -> None:
                 # Salva H-channel (uint8 grayscale)
                 cv2.imwrite(
                     str(out_h / (img_path.stem + ".png")),
-                    result["h_channel"]
+                    result["hematoxylin_h"]
                 )
                 # Salva RGB normalizzata (uint8 BGR per OpenCV)
-                rgb_bgr = cv2.cvtColor(result["rgb_normalized"], cv2.COLOR_RGB2BGR)
+                rgb_bgr = cv2.cvtColor(result["denoised_rgb"], cv2.COLOR_RGB2BGR)
                 cv2.imwrite(
                     str(out_rgb / (img_path.stem + ".png")),
                     rgb_bgr
@@ -149,6 +165,7 @@ def run_fase1(verbose: bool = True) -> None:
     elapsed = time.time() - t0
     print(f"\n[Fase 1] Completata: {n_ok} immagini OK, {n_err} errori — "
           f"{elapsed:.1f}s ({elapsed/max(n_ok,1):.2f}s/img)")
+
 
 
 # ---------------------------------------------------------------------------
