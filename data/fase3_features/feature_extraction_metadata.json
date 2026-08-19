@@ -1,0 +1,128 @@
+{
+  "fase": 3,
+  "modulo": "src/03_feature_extraction.py",
+  "generato_il": "2026-08-19T22:41:30+02:00",
+  "calibrazione": {
+    "microns_per_pixel": 0.46,
+    "pixel_area_um2": 0.2116,
+    "patch_size_px": 224,
+    "patch_side_um": 103.04,
+    "patch_area_um2": 10617.2416,
+    "provenienza": "Dedotta dalle condizioni di esportazione dichiarate in Carreras et al. (2025): patch convertite a 200x = obiettivo 20x. Vedi src/calibration.py e reports/fase1_report.md."
+  },
+  "conteggi": {
+    "patch_processate": 600,
+    "patch_in_errore": 0,
+    "nuclei_totali": 94042
+  },
+  "feature": {
+    "n_feature": 47,
+    "n_metadati": 3,
+    "colonne_metadati": [
+      "image_name",
+      "category",
+      "target"
+    ],
+    "colonne_feature": [
+      "n_nuclei",
+      "nuclear_density_per_1000um2",
+      "nuclear_area_fraction",
+      "area_top10_mean_um2",
+      "area_top10_short_axis_um",
+      "area_um2_mean",
+      "area_um2_std",
+      "area_um2_skew",
+      "area_um2_cv",
+      "perimeter_um_mean",
+      "perimeter_um_std",
+      "perimeter_um_skew",
+      "perimeter_um_cv",
+      "circularity_mean",
+      "circularity_std",
+      "circularity_skew",
+      "circularity_cv",
+      "eccentricity_mean",
+      "eccentricity_std",
+      "eccentricity_skew",
+      "eccentricity_cv",
+      "solidity_mean",
+      "solidity_std",
+      "solidity_skew",
+      "solidity_cv",
+      "major_axis_um_mean",
+      "major_axis_um_std",
+      "major_axis_um_skew",
+      "major_axis_um_cv",
+      "minor_axis_um_mean",
+      "minor_axis_um_std",
+      "minor_axis_um_skew",
+      "minor_axis_um_cv",
+      "aspect_ratio_mean",
+      "aspect_ratio_std",
+      "aspect_ratio_skew",
+      "aspect_ratio_cv",
+      "knn1_dist_mean_um",
+      "knn1_dist_std_um",
+      "knn3_dist_mean_um",
+      "knn3_dist_std_um",
+      "glcm_contrast",
+      "glcm_homogeneity",
+      "glcm_energy",
+      "lbp_entropy",
+      "hchannel_mean",
+      "hchannel_std"
+    ]
+  },
+  "parametri_glcm": {
+    "levels": 64,
+    "distances_px": [
+      1
+    ],
+    "angles_deg": [
+      0,
+      45,
+      90,
+      135
+    ],
+    "symmetric": true,
+    "proprieta": [
+      "contrast",
+      "homogeneity",
+      "energy"
+    ],
+    "mascherato_sui_nuclei": true,
+    "nota": "Le coppie che coinvolgono pixel di sfondo sono scartate (riga e colonna 0 della matrice). Le tre proprieta' usate sono invarianti allo shift di indice che ne deriva."
+  },
+  "parametri_lbp": {
+    "points": 8,
+    "radius_px": 1,
+    "method": "uniform",
+    "n_bins": 10,
+    "entropia": "Shannon, base 2",
+    "mascherato_sui_nuclei": true,
+    "nota": "L'operatore LBP e' calcolato sull'intera patch perche' richiede il vicinato reale di ogni pixel; e' l'istogramma a essere ristretto ai pixel nucleari."
+  },
+  "parametri_knn": {
+    "k": [
+      1,
+      3
+    ],
+    "metrica": "euclidea sui centroidi in um",
+    "self_match_escluso": true,
+    "valore_se_non_definito": "NaN (servono almeno k+1 nuclei)"
+  },
+  "decisioni": {
+    "D1": "NaN, non 0.0, sulle distanze k-NN non definibili",
+    "D2": "Tessitura calcolata sui soli pixel nucleari",
+    "D3": "GLCM quantizzata a 64 livelli di grigio",
+    "D7": "Delaunay, MST, k=5 e momenti CIE-LAB esclusi: vedi reports/fase3_report.md 1.1 e 7"
+  },
+  "ambiente": {
+    "python": "3.14.3",
+    "numpy": "2.4.3",
+    "scipy": "1.17.1",
+    "scikit-image": "0.26.0",
+    "opencv-python": "5.0.0.93"
+  },
+  "tempo_esecuzione_s": 183.8
+}
