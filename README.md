@@ -69,10 +69,16 @@ testNuovoTesi/
 │
 ├── src/                                   # Codice sorgente modulare Python
 │   ├── run_pipeline.py                    # ⭐ Entry point principale — esegue l'intera pipeline
+│   ├── naming.py                          # Convenzioni di naming, categorie e risoluzione percorsi
 │   ├── 01_preprocessing.py                # Pipeline Macenko + Deconvoluzione H-channel
 │   ├── 02_segmentation.py                 # Marker-Controlled Watershed v3.0 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   └── 04_classification.py               # Machine Learning Tabulare & XAI (SHAP)
+│
+├── tests/                                 # Test automatici (pytest)
+│   ├── test_naming.py                     # Convenzioni di naming e categorie
+│   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
+│   └── test_segmentation_split.py         # Split stratificato train/val
 │
 ├── Biblioteca personale.txt               # Riferimenti bibliografici accademici
 ├── requirements.txt                       # Dipendenze Python con versioni pinned
@@ -101,8 +107,9 @@ testNuovoTesi/
 ## 🛠️ Requisiti e Installazione
 
 ### Requisiti Ambiente Locale
-- **Python:** $\ge 3.10$
-- **Librerie Principali:** `opencv-python`, `scikit-image`, `scipy`, `numpy`, `torch`, `torchvision`, `matplotlib`
+- **Ambiente di riferimento:** Python **3.14.3** su Windows 11, esecuzione su CPU (verificato il 19 agosto 2026). Il benchmark di segmentazione con Cellpose è stato eseguito su Google Colab / GPU Tesla T4.
+- **Librerie Principali:** `numpy 2.4.3`, `scipy 1.17.1`, `scikit-image 0.26.0`, `opencv-python 5.0.0.93`, `torch 2.13.0`, `torchvision 0.28.0`, `matplotlib 3.10.8`
+- Le versioni sono **fissate esattamente** in `requirements.txt`: sono quelle sotto cui sono stati prodotti i risultati numerici riportati nei report.
 
 ```bash
 # 1. Installare le dipendenze (prima esecuzione)
@@ -118,7 +125,21 @@ python src/run_pipeline.py --fase 2        # Solo Segmentazione
 # I singoli moduli possono essere eseguiti per i self-test interni:
 python src/01_preprocessing.py            # [TEST] self-test modulo Preprocessing
 python src/02_segmentation.py             # [TEST] self-test modulo Segmentazione
+
+# Suite di test automatici
+python -m pytest tests/ -q
 ```
+
+### Convenzioni dei nomi di file
+
+Tutti i nomi dei file intermedi e le etichette di categoria sono definiti in un
+unico punto, `src/naming.py`, e verificati dai test contro i file realmente
+presenti su disco:
+
+| Fase | File prodotto | Categoria canonica |
+|---|---|---|
+| Fase 1 | `<stem>_norm.png`, `<stem>_hchannel.png` | `follicular_lymphoma` |
+| Fase 2 | `<stem>_mask.png`, `<stem>_overlay.png` | `reactive_tissue` |
 
 ---
 

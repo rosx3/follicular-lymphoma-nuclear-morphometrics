@@ -53,10 +53,18 @@ STORIA DELLA RILEVAZIONE MARKER (v4.1 → v4.2, 19/08/2026):
 """
 
 import os
+import sys
 import cv2
 import numpy as np
 import scipy.ndimage as ndi
 from pathlib import Path
+
+# src/ non e' un package: garantisce l'import di naming anche quando questo
+# modulo viene caricato dinamicamente da run_pipeline.py.
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from naming import CATEGORY_FL, CATEGORY_REACTIVE, normalize_category  # noqa: E402
+
 from skimage.feature import peak_local_max
 from skimage.morphology import h_maxima
 from skimage.segmentation import watershed
@@ -617,8 +625,13 @@ def split_gt_patches(gt_patch_paths: list, val_fraction: float = 0.33, seed: int
     """
     rng = np.random.default_rng(seed)
 
-    fl_patches = [p for p in gt_patch_paths if p[2] == 'Follicular Lymphoma']
-    re_patches = [p for p in gt_patch_paths if p[2] == 'Reactive Tissue']
+    # La categoria viene normalizzata (vedi src/naming.py): la funzione accetta
+    # sia le etichette canoniche sia quelle storiche, e solleva ValueError su
+    # un'etichetta ignota invece di restituire in silenzio uno split vuoto.
+    categories = [normalize_category(p[2]) for p in gt_patch_paths]
+
+    fl_patches = [p for p, c in zip(gt_patch_paths, categories) if c == CATEGORY_FL]
+    re_patches = [p for p, c in zip(gt_patch_paths, categories) if c == CATEGORY_REACTIVE]
 
     train_paths, val_paths = [], []
 
