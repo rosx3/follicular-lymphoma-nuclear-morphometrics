@@ -36,6 +36,7 @@ Output generati:
 
 import argparse
 import csv
+import sys
 import time
 from pathlib import Path
 
@@ -46,6 +47,25 @@ from tqdm import tqdm
 import importlib.util
 
 _SRC_DIR = Path(__file__).resolve().parent
+
+# src/ non e' un package: va reso importabile per i moduli con nome regolare.
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
+# Convenzioni di naming e categorie — unica fonte di verita' (vedi src/naming.py)
+from naming import (  # noqa: E402
+    CATEGORIES,
+    CATEGORY_FL,
+    PatchInputs,
+    h_channel_name,
+    iter_h_channel_inputs,
+    iter_patch_inputs,
+    mask_name,
+    overlay_name,
+    rgb_normalized_name,
+    short_label,
+    target_from_category,
+)
 
 # Modulo 01: Preprocessing
 _spec_prep = importlib.util.spec_from_file_location("mod_preprocessing", _SRC_DIR / "01_preprocessing.py")
@@ -84,11 +104,6 @@ FASE1_DIR     = BASE_DIR / "data" / "fase1_preprocessing"
 FASE2_DIR     = BASE_DIR / "data" / "fase2_segmentation"
 FASE3_DIR     = BASE_DIR / "data" / "fase3_features"
 IMG_FASE3_DIR = BASE_DIR / "img" / "fase3"
-
-CATEGORIES = {
-    "follicular_lymphoma": "FL",
-    "reactive_tissue":     "REACTIVE",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -151,13 +166,13 @@ def run_fase1(verbose: bool = True) -> None:
 
                 # Salva H-channel (uint8 grayscale)
                 cv2.imwrite(
-                    str(out_h / (img_path.stem + ".png")),
+                    str(out_h / h_channel_name(img_path.stem)),
                     result["hematoxylin_h"]
                 )
                 # Salva RGB normalizzata (uint8 BGR per OpenCV)
                 rgb_bgr = cv2.cvtColor(result["denoised_rgb"], cv2.COLOR_RGB2BGR)
                 cv2.imwrite(
-                    str(out_rgb / (img_path.stem + ".png")),
+                    str(out_rgb / rgb_normalized_name(img_path.stem)),
                     rgb_bgr
                 )
                 n_ok += 1
@@ -198,51 +213,47 @@ def run_fase2(verbose: bool = True) -> None:
     t0 = time.time()
 
     for cat_name in CATEGORIES:
-        h_dir = FASE1_DIR / cat_name / "h_channel"
-
-        if not h_dir.exists():
-            print(f"  [SKIP] {h_dir} non trovata — esegui prima la Fase 1.")
-            continue
-
         out_masks    = FASE2_DIR / cat_name / "masks"
         out_overlays = FASE2_DIR / cat_name / "overlays"
         out_masks.mkdir(parents=True, exist_ok=True)
         out_overlays.mkdir(parents=True, exist_ok=True)
 
-        h_paths = sorted(h_dir.glob("*.png"))
+        # iter_h_channel_inputs risolve H-channel + RGB normalizzata e solleva
+        # FileNotFoundError se un input manca: nessun overlay viene piu' saltato
+        # in silenzio.
+        images = list(iter_h_channel_inputs(cat_name, FASE1_DIR))
 
-        # Immagini RGB originali per gli overlay
-        rgb_dir = FASE1_DIR / cat_name / "rgb_normalized"
-
-        for h_path in tqdm(h_paths, desc=f"  Fase 2 — {cat_name}", unit="img"):
+        for image in tqdm(images, desc=f"  Fase 2 — {cat_name}", unit="img"):
             try:
-                h_channel = cv2.imread(str(h_path), cv2.IMREAD_GRAYSCALE)
+                stem = image.stem
+
+                h_channel = cv2.imread(str(image.h_channel_path), cv2.IMREAD_GRAYSCALE)
                 if h_channel is None:
-                    raise ValueError(f"Impossibile leggere {h_path.name}")
+                    raise ValueError(f"Impossibile leggere {image.h_channel_path.name}")
 
                 # Segmentazione Watershed
                 instance_mask, centroids = segment_nuclei_watershed(h_channel)
 
                 # Salva maschera 16-bit
-                mask_path = out_masks / (h_path.stem + "_mask.png")
+                mask_path = out_masks / mask_name(stem)
                 cv2.imwrite(str(mask_path), instance_mask.astype(np.uint16))
 
-                # Overlay visivo (se esiste immagine RGB corrispondente)
-                rgb_path = rgb_dir / h_path.name
-                if rgb_path.exists():
-                    rgb_img = cv2.imread(str(rgb_path), cv2.IMREAD_COLOR)
-                    rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
-                    overlay = draw_segmentation_overlay(rgb_img, instance_mask, centroids)
-                    overlay_bgr = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
-                    cv2.imwrite(
-                        str(out_overlays / (h_path.stem + "_overlay.png")),
-                        overlay_bgr
-                    )
+                # Overlay visivo sulla RGB normalizzata corrispondente
+                rgb_img = cv2.imread(str(image.rgb_path), cv2.IMREAD_COLOR)
+                if rgb_img is None:
+                    raise ValueError(f"Impossibile leggere {image.rgb_path.name}")
+                rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
+                overlay = draw_segmentation_overlay(rgb_img, instance_mask, centroids)
+                overlay_bgr = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(
+                    str(out_overlays / overlay_name(stem)),
+                    overlay_bgr
+                )
 
                 # Aggrega centroidi al CSV master
                 for c in centroids:
                     all_centroids.append({
-                        "image_name":       h_path.stem,
+                        "image_name":       stem,
                         "category":         cat_name,
                         "nucleus_id":       c["id"],
                         "centroid_x_px":    c["centroid_x_px"],
@@ -256,7 +267,7 @@ def run_fase2(verbose: bool = True) -> None:
                 n_ok += 1
 
             except Exception as e:
-                print(f"\n  [WARN] Errore su {h_path.name}: {e}")
+                print(f"\n  [WARN] Errore su {image.h_channel_path.name}: {e}")
                 n_err += 1
 
     # Salva CSV master dei centroidi
@@ -305,53 +316,46 @@ def run_fase3(verbose: bool = True) -> None:
     n_err = 0
     t0 = time.time()
 
-    sample_fl_rgb, sample_fl_mask = None, None
-    sample_re_rgb, sample_re_mask = None, None
+    sample_fl: PatchInputs | None = None
+    sample_re: PatchInputs | None = None
 
-    for cat_name, cat_label in CATEGORIES.items():
-        mask_dir = FASE2_DIR / cat_name / "masks"
-        rgb_dir  = FASE1_DIR / cat_name / "rgb_normalized"
+    for category in CATEGORIES:
+        # iter_patch_inputs risolve maschera + RGB + H-channel secondo le
+        # convenzioni di src/naming.py e solleva FileNotFoundError se un input
+        # manca: nessuna patch viene piu' saltata in silenzio (audit B1).
+        patches = list(iter_patch_inputs(category, FASE1_DIR, FASE2_DIR))
 
-        if not mask_dir.exists():
-            print(f"  [SKIP] {mask_dir} non trovata — esegui prima la Fase 2.")
-            continue
-
-        mask_paths = sorted(mask_dir.glob("*.png"))
-
-        for mask_p in tqdm(mask_paths, desc=f"  Fase 3 — {cat_label}", unit="img"):
+        for patch in tqdm(patches, desc=f"  Fase 3 — {short_label(category)}", unit="img"):
             try:
-                mask_16 = cv2.imread(str(mask_p), cv2.IMREAD_UNCHANGED)
+                mask_16 = cv2.imread(str(patch.mask_path), cv2.IMREAD_UNCHANGED)
                 if mask_16 is None:
-                    raise ValueError(f"Impossibile leggere {mask_p.name}")
+                    raise ValueError(f"Impossibile leggere {patch.mask_path.name}")
 
                 # 1. Estrazione d'istanza per singolo nucleo
                 nuclei_feat = extract_nucleus_morphometry(mask_16)
 
                 # Salva campioni per l'anteprima grafica
-                rgb_p = rgb_dir / mask_p.name.replace("_mask.png", ".png")
-                if cat_label == "FL" and sample_fl_rgb is None and rgb_p.exists():
-                    sample_fl_rgb, sample_fl_mask = str(rgb_p), str(mask_p)
-                elif cat_label == "REACTIVE" and sample_re_rgb is None and rgb_p.exists():
-                    sample_re_rgb, sample_re_mask = str(rgb_p), str(mask_p)
-
-                image_stem = mask_p.stem.replace("_mask", "")
+                if category == CATEGORY_FL and sample_fl is None:
+                    sample_fl = patch
+                elif category != CATEGORY_FL and sample_re is None:
+                    sample_re = patch
 
                 for nf in nuclei_feat:
-                    nf["image_name"] = image_stem
-                    nf["category"]   = cat_label
+                    nf["image_name"] = patch.stem
+                    nf["category"]   = category
                     all_nuclei_rows.append(nf)
 
                 # 2. Aggregazione statistica per patch
                 patch_stat = aggregate_patch_morphometry(
-                    nuclei_feat, image_stem, cat_label
+                    nuclei_feat, patch.stem, category
                 )
-                patch_stat["target"] = 1 if cat_label == "FL" else 0
+                patch_stat["target"] = target_from_category(category)
                 all_patch_rows.append(patch_stat)
 
                 n_ok += 1
 
             except Exception as e:
-                print(f"\n  [WARN] Errore su {mask_p.name}: {e}")
+                print(f"\n  [WARN] Errore su {patch.mask_path.name}: {e}")
                 n_err += 1
 
     # 3. Salva CSV Singoli Nuclei (~94.042 righe)
@@ -379,13 +383,18 @@ def run_fase3(verbose: bool = True) -> None:
         print(f"[Fase 3] CSV Patch Master: {len(all_patch_rows)} patch → {csv_patches}")
 
     # 5. Generazione Anteprima Grafica con Bounding Boxes
-    if sample_fl_rgb and sample_re_rgb:
-        preview_png = IMG_FASE3_DIR / "morphometry_regions_preview.png"
-        save_morphometry_visual_preview(
-            sample_fl_rgb, sample_fl_mask,
-            sample_re_rgb, sample_re_mask,
-            str(preview_png)
+    if sample_fl is None or sample_re is None:
+        raise RuntimeError(
+            "Anteprima citomorfometrica non generabile: manca almeno una patch "
+            f"campione (FL={sample_fl is not None}, REACTIVE={sample_re is not None})."
         )
+
+    preview_png = IMG_FASE3_DIR / "morphometry_regions_preview.png"
+    save_morphometry_visual_preview(
+        str(sample_fl.rgb_path), str(sample_fl.mask_path),
+        str(sample_re.rgb_path), str(sample_re.mask_path),
+        str(preview_png)
+    )
 
     elapsed = time.time() - t0
     print(f"[Fase 3] Completata: {n_ok} patch OK, {n_err} errori — "

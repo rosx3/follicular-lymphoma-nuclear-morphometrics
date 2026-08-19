@@ -3,11 +3,11 @@
 Modulo 03: Estrazione Biomarcatori Citomorfometrici, Spaziali e di Tessitura
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Linfoide Reattivo
       tramite Morfometria Nucleare e AI Interpretabile (White-Box XAI)
-Versione: 2.0 — Skeleton allineato a reports/fase3_report.md (agosto 2026)
+Versione: 2.1 — Skeleton allineato a reports/fase3_report.md (agosto 2026)
 ===============================================================================
 Questo modulo implementa la caratterizzazione citomorfometrica, micro-spaziale
 e di tessitura secondo il set definitivo di biomarcatori documentato in
-reports/fase3_report.md (Sezione 2 — 51 feature + 3 metadati):
+reports/fase3_report.md (Sezione 2 — 47 feature + 3 metadati):
 
  1. STEP 1 — Morfometria d'istanza per singolo nucleo (questo file, completo).
  2. STEP 2 — Aggregazione statistica per patch: mean/std/skew/cv su 8 feature
@@ -34,17 +34,18 @@ DECISIONI METODOLOGICHE GIA' VALIDATE (vedi reports/fase3_report.md §1.1):
     necessaria per completare il set di 8 feature morfometriche di base
     dichiarate in reports/fase3_report.md §2.4.
 
-NOTA APERTA PER LA TESI (da verificare con l'utente prima di finalizzare):
-  Il report fase3_report.md dichiara "51 feature + 3 metadati" in apertura
-  della Sezione 2, ma la somma dei sub-totali dichiarati per sezione
-  (3 densità + 2 Iwamoto + 32 morfometria + 4 knn + 6 tessitura = 47) non
-  torna con 51. Il conteggio di 32 colonne morfometriche è coerente solo se
-  si applicano uniformemente le 4 statistiche (mean/std/skew/cv) a tutte le
-  8 feature di base (8*4=32) — la tabella dettagliata §2.4 elenca invece
-  conteggi ridotti e disomogenei per singola feature. In questo skeleton
-  ho adottato l'interpretazione uniforme (32 colonne, 4 stat x 8 feature)
-  perché è l'unica che rende quadrare il totale dichiarato di 51. Verificare
-  empiricamente le colonne prodotte una volta eseguita la pipeline completa.
+CONTEGGIO DELLE FEATURE (questione chiusa, vedi nota di correzione in
+reports/fase3_report.md §2):
+  Il totale corretto e' 47 feature + 3 metadati, come somma dei sub-totali
+  di sezione: 3 densita' + 2 Iwamoto + 32 morfometria + 4 k-NN + 6 tessitura.
+  Le 32 colonne di morfometria derivano dall'applicazione uniforme delle 4
+  statistiche (mean/std/skew/cv) a tutte le 8 feature di base elencate in
+  MORPHOMETRY_BASE_FEATURES (8 x 4 = 32) — che e' l'interpretazione
+  implementata qui. Il valore "51" riportato dalla prima stesura del report
+  era un errore di somma, corretto il 19 agosto 2026.
+
+  Con gli STEP 3 e 4 ancora da implementare, il modulo produce attualmente
+  37 delle 47 feature (mancano le 4 k-NN e le 6 di tessitura).
 ===============================================================================
 """
 
@@ -363,7 +364,7 @@ def save_morphometry_visual_preview(
 # Self-test del Modulo
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print("[INFO] Modulo 03 — Estrazione Citomorfometrica Nucleare v2.0 (skeleton)")
+    print("[INFO] Modulo 03 — Estrazione Citomorfometrica Nucleare v2.1 (skeleton)")
 
     synthetic_mask = np.zeros((64, 64), dtype=np.int32)
     synthetic_mask[10:22, 10:22] = 1   # quadrato 12x12

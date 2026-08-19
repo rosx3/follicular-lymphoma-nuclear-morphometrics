@@ -1,29 +1,44 @@
 # requirements.txt — Ambiente Python per il progetto di tesi
-# Testato con Python 3.10 su CPU (locale) e GPU Tesla T4 (Google Colab)
 # Per installare: pip install -r requirements.txt
+#
+# AMBIENTE DI RIFERIMENTO (verificato il 19 agosto 2026)
+#   Python 3.14.3 — Windows 11, esecuzione su CPU
+#   Il benchmark di segmentazione della Fase 2 (Cellpose come Ground Truth
+#   indipendente) e' stato eseguito separatamente su Google Colab / GPU Tesla T4.
+#
+# Le versioni sono fissate con == perche' sono quelle sotto cui sono stati
+# prodotti i risultati numerici riportati nei report: un vincolo permissivo
+# renderebbe i valori della tesi non riproducibili.
 
 # === Core scientifico ===
-numpy>=1.24,<2.0
-scipy>=1.11
-scikit-image>=0.21
-scikit-learn>=1.3
-opencv-python>=4.8
-Pillow>=10.0
-matplotlib>=3.7
-pandas>=2.0
+numpy==2.4.3
+scipy==1.17.1
+scikit-image==0.26.0
+scikit-learn==1.8.0
+opencv-python==5.0.0.93
+Pillow==12.1.1
+matplotlib==3.10.8
+pandas==2.3.3
 
-# === Deep Learning (PyTorch — versione CPU) ===
-# Per GPU: sostituire con torch==2.1.0+cu118 --index-url https://download.pytorch.org/whl/cu118
-torch>=2.1
-torchvision>=0.16
+# === Deep Learning ===
+# Versioni installate in locale: torch 2.13.0+cpu, torchvision 0.28.0+cpu.
+# I tag locali "+cpu" non sono risolvibili dall'indice PyPI standard: qui sono
+# indicate le versioni base. Per GPU (CUDA 11.8) usare:
+#   pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu118
+torch==2.13.0
+torchvision==0.28.0
 
 # === Segmentazione (benchmark Colab) ===
 # cellpose>=3.0   # Solo su Colab/GPU — non installare in locale CPU
 
 # === Machine Learning e Interpretabilità (Fase 4) ===
-xgboost>=2.0
-shap>=0.44
+xgboost==3.2.0
+shap==0.51.0
 
 # === Utility ===
-tqdm>=4.66
-joblib>=1.3
+tqdm==4.67.3
+joblib==1.5.3
+
+# === Test (sviluppo) ===
+# Esecuzione: python -m pytest tests/ -q
+pytest==9.1.1
