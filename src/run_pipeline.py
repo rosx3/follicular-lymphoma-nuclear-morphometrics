@@ -36,8 +36,11 @@ Output generati:
 
 import argparse
 import csv
+import importlib.metadata
+import json
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import cv2
@@ -51,6 +54,25 @@ _SRC_DIR = Path(__file__).resolve().parent
 # src/ non e' un package: va reso importabile per i moduli con nome regolare.
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
+
+# Calibrazione spaziale — unica fonte di verita' (vedi src/calibration.py)
+from calibration import (  # noqa: E402
+    MICRONS_PER_PIXEL,
+    PATCH_AREA_UM2,
+    PATCH_SIDE_UM,
+    PATCH_SIZE_PX,
+    PIXEL_AREA_UM2,
+    px2_to_um2,
+    px_to_um,
+)
+
+
+def _package_version(name: str) -> str:
+    """Versione installata di un pacchetto, o stringa vuota se non risolvibile."""
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return ""
 
 # Convenzioni di naming e categorie — unica fonte di verita' (vedi src/naming.py)
 from naming import (  # noqa: E402
@@ -91,7 +113,20 @@ _spec_feat.loader.exec_module(_mod_feat)
 
 extract_nucleus_morphometry    = _mod_feat.extract_nucleus_morphometry
 aggregate_patch_morphometry    = _mod_feat.aggregate_patch_morphometry
+compute_knn_spatial_features   = _mod_feat.compute_knn_spatial_features
+extract_texture_features       = _mod_feat.extract_texture_features
 save_morphometry_visual_preview = _mod_feat.save_morphometry_visual_preview
+PATCH_METADATA_COLUMNS         = _mod_feat.PATCH_METADATA_COLUMNS
+PATCH_FEATURE_COLUMNS          = _mod_feat.PATCH_FEATURE_COLUMNS
+
+# Parametri dei descrittori, registrati nel metadata JSON per riproducibilità
+GLCM_LEVELS         = _mod_feat.GLCM_LEVELS
+GLCM_DISTANCES      = _mod_feat.GLCM_DISTANCES
+GLCM_ANGLES_DEG     = _mod_feat.GLCM_ANGLES_DEG
+LBP_POINTS          = _mod_feat.LBP_POINTS
+LBP_RADIUS          = _mod_feat.LBP_RADIUS
+LBP_METHOD          = _mod_feat.LBP_METHOD
+KNN_NEIGHBOR_COUNTS = _mod_feat.KNN_NEIGHBOR_COUNTS
 
 
 
@@ -265,10 +300,10 @@ def run_fase2(verbose: bool = True) -> None:
                         "nucleus_id":       c["id"],
                         "centroid_x_px":    c["centroid_x_px"],
                         "centroid_y_px":    c["centroid_y_px"],
-                        "centroid_x_um":    round(c["centroid_x_px"] * 0.23, 3),
-                        "centroid_y_um":    round(c["centroid_y_px"] * 0.23, 3),
+                        "centroid_x_um":    round(px_to_um(c["centroid_x_px"]), 3),
+                        "centroid_y_um":    round(px_to_um(c["centroid_y_px"]), 3),
                         "area_px":          c.get("area_px", 0),
-                        "area_um2":         round(c.get("area_px", 0) * (0.23 ** 2), 3),
+                        "area_um2":         round(px2_to_um2(c.get("area_px", 0)), 3),
                     })
 
                 n_ok += 1
@@ -338,6 +373,10 @@ def run_fase3(verbose: bool = True) -> None:
                 if mask_16 is None:
                     raise ValueError(f"Impossibile leggere {patch.mask_path.name}")
 
+                h_channel = cv2.imread(str(patch.h_channel_path), cv2.IMREAD_GRAYSCALE)
+                if h_channel is None:
+                    raise ValueError(f"Impossibile leggere {patch.h_channel_path.name}")
+
                 # 1. Estrazione d'istanza per singolo nucleo
                 nuclei_feat = extract_nucleus_morphometry(mask_16)
 
@@ -352,10 +391,15 @@ def run_fase3(verbose: bool = True) -> None:
                     nf["category"]   = category
                     all_nuclei_rows.append(nf)
 
-                # 2. Aggregazione statistica per patch
+                # 2. Aggregazione statistica per patch (densità, Iwamoto, morfometria)
                 patch_stat = aggregate_patch_morphometry(
                     nuclei_feat, patch.stem, category
                 )
+                # 3. Distanze micro-spaziali k-NN sui centroidi in µm
+                patch_stat.update(compute_knn_spatial_features(nuclei_feat))
+                # 4. Tessitura cromatinica sui soli pixel nucleari
+                patch_stat.update(extract_texture_features(h_channel, mask_16))
+
                 patch_stat["target"] = target_from_category(category)
                 all_patch_rows.append(patch_stat)
 
@@ -379,15 +423,30 @@ def run_fase3(verbose: bool = True) -> None:
             writer.writerows(all_nuclei_rows)
         print(f"\n[Fase 3] CSV Nuclei Singoli: {len(all_nuclei_rows):,} nuclei → {csv_nuclei}")
 
-    # 4. Salva CSV Patch Master (600 righe)
+    # 4. Salva CSV Patch Master (600 righe x 50 colonne)
     if all_patch_rows:
         csv_patches = FASE3_DIR / "features_patches_master.csv"
-        fieldnames = list(all_patch_rows[0].keys())
+        # Il contratto delle colonne (src/03_feature_extraction.py) è dichiarato,
+        # non dedotto dalla prima riga. extrasaction="raise" intercetta le colonne
+        # di troppo, ma una colonna MANCANTE diventerebbe una cella vuota in
+        # silenzio: va verificata a parte.
+        fieldnames = list(PATCH_METADATA_COLUMNS) + list(PATCH_FEATURE_COLUMNS)
+
+        expected = set(fieldnames)
+        for row in all_patch_rows:
+            missing = expected - set(row)
+            if missing:
+                raise ValueError(
+                    f"Patch '{row.get('image_name', '?')}': colonne mancanti "
+                    f"rispetto al contratto: {sorted(missing)}"
+                )
+
         with open(csv_patches, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="raise")
             writer.writeheader()
             writer.writerows(all_patch_rows)
-        print(f"[Fase 3] CSV Patch Master: {len(all_patch_rows)} patch → {csv_patches}")
+        print(f"[Fase 3] CSV Patch Master: {len(all_patch_rows)} patch x "
+              f"{len(fieldnames)} colonne → {csv_patches}")
 
     # 5. Generazione Anteprima Grafica con Bounding Boxes
     if sample_fl is None or sample_re is None:
@@ -404,6 +463,94 @@ def run_fase3(verbose: bool = True) -> None:
     )
 
     elapsed = time.time() - t0
+
+    # 6. Metadati di riproducibilità (principi FAIR)
+    # I CSV da soli non bastano: la quantizzazione GLCM, il raggio LBP, i valori
+    # di k e la calibrazione spaziale determinano i numeri estratti ma non sono
+    # desumibili dai dati. Vanno registrati insieme all'output.
+    metadata_path = FASE3_DIR / "feature_extraction_metadata.json"
+    metadata = {
+        "fase": 3,
+        "modulo": "src/03_feature_extraction.py",
+        "generato_il": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "calibrazione": {
+            "microns_per_pixel": MICRONS_PER_PIXEL,
+            "pixel_area_um2": PIXEL_AREA_UM2,
+            "patch_size_px": PATCH_SIZE_PX,
+            "patch_side_um": round(PATCH_SIDE_UM, 2),
+            "patch_area_um2": round(PATCH_AREA_UM2, 4),
+            "provenienza": (
+                "Dedotta dalle condizioni di esportazione dichiarate in Carreras et al. "
+                "(2025): patch convertite a 200x = obiettivo 20x. Vedi src/calibration.py "
+                "e reports/fase1_report.md."
+            ),
+        },
+        "conteggi": {
+            "patch_processate": n_ok,
+            "patch_in_errore": n_err,
+            "nuclei_totali": len(all_nuclei_rows),
+        },
+        "feature": {
+            "n_feature": len(PATCH_FEATURE_COLUMNS),
+            "n_metadati": len(PATCH_METADATA_COLUMNS),
+            "colonne_metadati": list(PATCH_METADATA_COLUMNS),
+            "colonne_feature": list(PATCH_FEATURE_COLUMNS),
+        },
+        "parametri_glcm": {
+            "levels": GLCM_LEVELS,
+            "distances_px": list(GLCM_DISTANCES),
+            "angles_deg": list(GLCM_ANGLES_DEG),
+            "symmetric": True,
+            "proprieta": ["contrast", "homogeneity", "energy"],
+            "mascherato_sui_nuclei": True,
+            "nota": (
+                "Le coppie che coinvolgono pixel di sfondo sono scartate (riga e "
+                "colonna 0 della matrice). Le tre proprieta' usate sono invarianti "
+                "allo shift di indice che ne deriva."
+            ),
+        },
+        "parametri_lbp": {
+            "points": LBP_POINTS,
+            "radius_px": LBP_RADIUS,
+            "method": LBP_METHOD,
+            "n_bins": LBP_POINTS + 2,
+            "entropia": "Shannon, base 2",
+            "mascherato_sui_nuclei": True,
+            "nota": (
+                "L'operatore LBP e' calcolato sull'intera patch perche' richiede il "
+                "vicinato reale di ogni pixel; e' l'istogramma a essere ristretto ai "
+                "pixel nucleari."
+            ),
+        },
+        "parametri_knn": {
+            "k": list(KNN_NEIGHBOR_COUNTS),
+            "metrica": "euclidea sui centroidi in um",
+            "self_match_escluso": True,
+            "valore_se_non_definito": "NaN (servono almeno k+1 nuclei)",
+        },
+        "decisioni": {
+            "D1": "NaN, non 0.0, sulle distanze k-NN non definibili",
+            "D2": "Tessitura calcolata sui soli pixel nucleari",
+            "D3": "GLCM quantizzata a 64 livelli di grigio",
+            "D7": (
+                "Delaunay, MST, k=5 e momenti CIE-LAB esclusi: vedi "
+                "reports/fase3_report.md 1.1 e 7"
+            ),
+        },
+        "ambiente": {
+            "python": ".".join(str(v) for v in sys.version_info[:3]),
+            **{
+                library: _package_version(library)
+                for library in ("numpy", "scipy", "scikit-image", "opencv-python")
+            },
+        },
+        "tempo_esecuzione_s": round(elapsed, 1),
+    }
+
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    print(f"[Fase 3] Metadati di riproducibilità → {metadata_path}")
+
     print(f"[Fase 3] Completata: {n_ok} patch OK, {n_err} errori — "
           f"{elapsed:.1f}s ({elapsed/max(n_ok,1):.2f}s/img)")
 
@@ -412,6 +559,15 @@ def run_fase3(verbose: bool = True) -> None:
 # Entry Point
 # ---------------------------------------------------------------------------
 def main():
+    # Su Windows la console usa cp1252: i caratteri non ASCII dei messaggi di
+    # avanzamento (→, µ, ✅) fanno fallire print() quando l'output e' rediretto
+    # su file. Senza questa riga la pipeline puo' interrompersi con
+    # UnicodeEncodeError DOPO aver elaborato tutte le patch, perdendo il lavoro.
+    # Applicata solo qui: importare il modulo non deve toccare lo stdout altrui.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Pipeline Morfometria Nucleare — Linfoma Follicolare vs Tessuto Reattivo",
         formatter_class=argparse.RawTextHelpFormatter,

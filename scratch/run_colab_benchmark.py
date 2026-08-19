@@ -71,7 +71,7 @@ print(f'[Split] Train: {len(train_patches)} patch ({len(train_patches)-n_val_re}
 print(f'[Split] Val:   {len(val_patches)} patch ({n_val_fl} FL + {n_val_re} RE)')
 
 # 1. Generazione GT Cellpose (su GPU con diametro calibrato a 22 px ≈ 5 µm per linfociti)
-CALIBRATED_DIAMETER_PX = 22.0  # 22 px * 0.23 µm/px = 5.06 µm (diametro medio reale linfocita)
+CALIBRATED_DIAMETER_PX = 22.0  # 22 px -> 10.1 µm con la calibrazione rivista (vedi src/calibration.py)
 print(f'\n[Cellpose] Generazione GT indipendente (diametro calibrato = {CALIBRATED_DIAMETER_PX} px ≈ 5 µm)...')
 cp_gpu = torch.cuda.is_available()
 cp_model = cp_models.CellposeModel(gpu=cp_gpu, model_type='nuclei')

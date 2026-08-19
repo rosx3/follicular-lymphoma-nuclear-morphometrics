@@ -98,6 +98,40 @@ def test_fase2_centroids_use_the_canonical_category(pipeline):
     assert categories <= {CATEGORY_FL, CATEGORY_REACTIVE}, f"categorie non canoniche: {categories}"
 
 
+def test_fase3_csv_has_exactly_the_50_contracted_columns(pipeline):
+    """Il CSV per patch e' l'input della Fase 4: la sua forma e' un contratto."""
+    import csv
+    import importlib.util
+
+    module, _stems = pipeline
+    spec = importlib.util.spec_from_file_location(
+        "mod_features_e2e", Path(__file__).resolve().parent.parent / "src" / "03_feature_extraction.py"
+    )
+    features = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(features)
+
+    with open(module.FASE3_DIR / "features_patches_master.csv", newline="", encoding="utf-8") as f:
+        header = next(csv.reader(f))
+
+    expected = list(features.PATCH_METADATA_COLUMNS) + list(features.PATCH_FEATURE_COLUMNS)
+    assert header == expected, "il CSV non rispetta il contratto delle colonne"
+    assert len(header) == 50
+
+
+def test_fase3_populates_the_knn_and_texture_columns(pipeline):
+    """Regressione: k-NN e tessitura devono essere davvero cablate in run_fase3."""
+    import csv
+
+    module, _stems = pipeline
+    with open(module.FASE3_DIR / "features_patches_master.csv", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    for column in ("knn1_dist_mean_um", "knn3_dist_mean_um", "glcm_contrast", "lbp_entropy"):
+        values = [r[column] for r in rows]
+        assert all(v != "" for v in values), f"colonna {column} vuota"
+        assert any(v not in ("", "nan", "0.0") for v in values), f"colonna {column} mai valorizzata"
+
+
 def test_fase3_produces_one_row_per_patch_with_the_right_target(pipeline):
     import csv
 
@@ -110,6 +144,63 @@ def test_fase3_produces_one_row_per_patch_with_the_right_target(pipeline):
     assert len(rows) == expected, "la Fase 3 ha saltato delle patch"
     for row in rows:
         assert row["target"] == ("1" if row["category"] == CATEGORY_FL else "0")
+
+
+def test_fase3_writes_a_reproducible_metadata_file(pipeline):
+    """I parametri che determinano i valori estratti devono essere ricostruibili.
+
+    Senza questo file, i CSV della Fase 3 non sono riproducibili: quantizzazione
+    GLCM, raggio LBP, k delle distanze e calibrazione spaziale non sarebbero
+    desumibili dai dati.
+    """
+    import json
+
+    module, stems = pipeline
+    metadata_path = module.FASE3_DIR / "feature_extraction_metadata.json"
+
+    assert metadata_path.exists(), "metadata di riproducibilita' non generato"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+    assert metadata["conteggi"]["patch_processate"] == sum(len(s) for s in stems.values())
+    assert metadata["conteggi"]["patch_in_errore"] == 0
+    assert metadata["feature"]["n_feature"] == 47
+    assert metadata["feature"]["n_metadati"] == 3
+
+    assert metadata["calibrazione"]["microns_per_pixel"] == 0.46
+    assert metadata["parametri_glcm"]["levels"] == 64
+    assert metadata["parametri_glcm"]["angles_deg"] == [0, 45, 90, 135]
+    assert metadata["parametri_glcm"]["mascherato_sui_nuclei"] is True
+    assert metadata["parametri_lbp"]["method"] == "uniform"
+    assert metadata["parametri_knn"]["k"] == [1, 3]
+
+
+def test_the_metadata_lists_the_same_columns_the_csv_contains(pipeline):
+    """Il file di metadati non deve poter divergere dal CSV che descrive."""
+    import csv
+    import json
+
+    module, _stems = pipeline
+    metadata = json.loads(
+        (module.FASE3_DIR / "feature_extraction_metadata.json").read_text(encoding="utf-8")
+    )
+    with open(module.FASE3_DIR / "features_patches_master.csv", newline="", encoding="utf-8") as f:
+        header = next(csv.reader(f))
+
+    declared = metadata["feature"]["colonne_metadati"] + metadata["feature"]["colonne_feature"]
+    assert declared == header
+
+
+def test_the_metadata_records_the_library_versions_used(pipeline):
+    """Le versioni contano: skimage cambia i default di graycomatrix fra release."""
+    import json
+
+    module, _stems = pipeline
+    ambiente = json.loads(
+        (module.FASE3_DIR / "feature_extraction_metadata.json").read_text(encoding="utf-8")
+    )["ambiente"]
+
+    for library in ("python", "numpy", "scipy", "scikit-image"):
+        assert ambiente.get(library), f"versione mancante per {library}"
 
 
 def test_fase3_generates_the_morphometry_preview(pipeline):

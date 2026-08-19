@@ -30,7 +30,7 @@ La pipeline adotta come metodo operativo principale un algoritmo d'istanza deter
 
 ## 3. Validazione Quantitativa e Benchmark Indipendente (Step 2.4)
 
-Per garantire il massimo rigore scientifico ed evitare la circolarità della validazione (ovvero valutare un algoritmo contro una Ground Truth generata da se stesso), la validazione quantitativa è stata condotta su un set di **10 patch di validazione indipendenti** (5 FL + 5 REACTIVE), valutando le predizioni contro una **Ground Truth generata da Cellpose v4.x** (*Stringer et al., Nature Methods 2021*), un modello deep learning generalista per microscopia, ricalibrato alla scala spaziale del dataset ($d = 22.0\text{ px} \approx 5.06\,\mu m$).
+Per garantire il massimo rigore scientifico ed evitare la circolarità della validazione (ovvero valutare un algoritmo contro una Ground Truth generata da se stesso), la validazione quantitativa è stata condotta su un set di **10 patch di validazione indipendenti** (5 FL + 5 REACTIVE), valutando le predizioni contro una **Ground Truth generata da Cellpose v4.x** (*Stringer et al., Nature Methods 2021*), un modello deep learning generalista per microscopia, ricalibrato alla scala spaziale del dataset ($d = 22.0\text{ px} \approx 10.1\,\mu m$).
 
 ### 3.1 Metriche Valutate
 
@@ -75,7 +75,7 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
    ⚠️ *Cautela statistica (vedi Sezione 7.7.5):* il vantaggio è **consistente su AJI e F1 in tutti i run disponibili**, ma **non robusto sul solo Dice pixel-level**, dove in un run su patch diverse la U-Net è risultata superiore. Formulare la conclusione in tesi privilegiando le metriche d'istanza, o mediare su più seed di addestramento prima della consegna.
 
 2. **Risoluzione Rigorosa della Circolarità della Validazione:**
-   L'uso di una Ground Truth generata da un modello esterno super partes (Cellpose v4.x, *Stringer et al., 2021*) ricalibrato alla dimensione reale dei nuclei linfocitari ($d = 22.0\text{ px} \approx 5.06\,\mu m$) ha permesso di eliminare il bias di autovalutazione.  
+   L'uso di una Ground Truth generata da un modello esterno super partes (Cellpose v4.x, *Stringer et al., 2021*) ricalibrato alla dimensione dei nuclei linfocitari ($d = 22.0\text{ px} \approx 10.1\,\mu m$) ha permesso di eliminare il bias di autovalutazione.  
    L'accordo di Dice del $63.7\%$ e l'AJI di $0.3097$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando perfettamente negli intervalli di concordanza standard riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
 
 3. **Maggiore F1-Detection nel Linfoma Follicolare (FL):**
@@ -91,7 +91,7 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 | `peak_threshold_rel` (v4.2, DEFAULT) | **0.15** | 15% del massimo della trasformata di distanza della patch; usato con `marker_method="relative_threshold"` | Parametro esplicito |
 | `h_maxima_px` (sperimentale, NON default) | **5 px** ($1.15\,\mu m$) | Prominenza minima locale di un massimo della distance map, indipendente dal massimo globale della patch. **Taratura superata:** inferiore al default sul benchmark Cellpose — vedi Sezione 7.7 | Vincent (1993); Sezione 7 |
 | `max_area_px` | **2500 px** ($132\,\mu m^2$) | Include i centroblasti di grandi dimensioni ($>100\,\mu m^2$) | Iwamoto et al. (2024) |
-| `microns_per_pixel` | **0.23 $\mu m$/px** | Calibrazione spaziale dello scanner a $40\times$ | Standard WSI |
+| `microns_per_pixel` | **0.46 $\mu m$/px** | Patch esportate a $200\times$ (obiettivo $20\times$) — vedi `reports/fase1_report.md` | Dedotta da Carreras et al. (2025) |
 
 ---
 

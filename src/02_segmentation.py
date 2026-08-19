@@ -9,7 +9,8 @@ Questo modulo gestisce:
  1. Segmentazione d'istanza dei nuclei con Marker-Controlled Watershed +
     Distance Transform sui canali Ematossilina (H-channel) pre-processati.
  2. Architettura PyTorch U-Net con backbone ResNet-34 (confronto accademico).
- 3. Estrazione coordinate centroidi (x, y) in pixel e micron (1 px = 0.23 µm).
+ 3. Estrazione coordinate centroidi (x, y) in pixel e micron
+    (calibrazione importata da src/calibration.py).
  4. Calcolo metriche di validazione quantitativa: Dice, IoU, AJI, F1 detection.
  5. Generazione di overlay visivi (contorni nuclei sovrapposti all'immagine RGB).
 
@@ -75,9 +76,9 @@ import torch.nn as nn
 import torchvision.models as models
 
 # ---------------------------------------------------------------------------
-# Costante di calibrazione spaziale
+# Costante di calibrazione spaziale — vedi src/calibration.py
 # ---------------------------------------------------------------------------
-MICRONS_PER_PIXEL = 0.23  # µm / px  (scanner tipico 40×)
+from calibration import MICRONS_PER_PIXEL  # noqa: E402,F401
 
 # Statistiche ImageNet per normalizzazione encoder ResNet-34 pre-addestrato
 # Fonte: PyTorch ResNet34_Weights.DEFAULT.transforms()
@@ -128,7 +129,7 @@ def segment_nuclei_watershed(
 
     Args:
         h_channel (np.ndarray): Canale H in scala di grigi uint8.
-        min_distance (int): Distanza minima in pixel tra centroidi locali (default 12 px ≈ 2.8 µm).
+        min_distance (int): Distanza minima in pixel tra centroidi locali (default 12 px ≈ 5.5 µm).
                             Usato solo con marker_method="relative_threshold".
         h_maxima_px (int): Prominenza minima (in px) di un massimo locale della distance
                            map per essere accettato come marker (default 5 px ≈ 1.15 µm).
@@ -143,7 +144,7 @@ def segment_nuclei_watershed(
                                     0.15). Usato solo con marker_method="relative_threshold".
         min_area_px (int): Area minima nucleare in pixel (default 30 px ≈ 1.6 µm²).
                            Rimuove rumori di binarizzazione e artefatti submicron.
-        max_area_px (int): Area massima nucleare in pixel (default 2500 px ≈ 132 µm²).
+        max_area_px (int): Area massima nucleare in pixel (default 2500 px ≈ 529 µm²).
                            Aumentato da 1500 a 2500 per includere centroblasti grandi
                            (Iwamoto et al. 2024: area mediana centroblasti ~55–70 µm², tail > 100 µm²).
         marker_method (str): "relative_threshold" (default, validato su GT Cellpose)
