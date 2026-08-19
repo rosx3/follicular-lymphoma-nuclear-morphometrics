@@ -42,7 +42,7 @@ A differenza dei classici approcci "Black-Box" basati su reti neurali convoluzio
 Il dataset è composto da **600 patch istologiche H&E** alla risoluzione di $224 \times 224$ pixel, estratte da biopsie linfonodali (*Zenodo DOI: 10.5281/zenodo.15702609*):
 - **300 patch** di **Linfoma Follicolare (FL)** (44.749 nuclei isolati)
 - **300 patch** di **Tessuto Reattivo (REACTIVE)** (49.293 nuclei isolati)
-- **Risoluzione Spaziale:** $0.23\,\mu m/\text{pixel}$ (calibrazione scanner $40\times$)
+- **Risoluzione Spaziale:** $0.46\,\mu m/\text{pixel}$ — patch esportate a $200\times$ (obiettivo $20\times$) dallo scanner Hamamatsu NanoZoomer S360. Campo visivo $103.04 \times 103.04\,\mu m$. Il valore è **dedotto** dalle condizioni di esportazione dichiarate in *Carreras et al. (2025)*, che non pubblicano una scala esplicita: derivazione completa in [`reports/fase1_report.md`](reports/fase1_report.md#come-è-stata-determinata-la-scala-spaziale).
 
 ---
 
@@ -96,7 +96,7 @@ testNuovoTesi/
 ### Fase 2: Segmentazione d'Istanza dei Nuclei Cellulari
 - **Algoritmo Operativo:** Marker-Controlled Distance-Transform Watershed ($12\text{ px} \approx 2.8\,\mu m$ min distance, max area $2500\text{ px} \approx 132\,\mu m^2$).
 - **Nuclei Estratti:** **94.042 nuclei totali** registrati nel file `centroids_all.csv`.
-- **Validazione Indipendente su GPU (Cellpose v4.x Oracle GT, $d=22.0\text{ px} \approx 5.06\,\mu m$):**
+- **Validazione Indipendente su GPU (Cellpose v4.x Oracle GT, $d=22.0\text{ px} \approx 10.1\,\mu m$):**
   - **Dice Score (Pixel-level):** Watershed **$63.73\% \pm 10.91\%$** vs U-Net ResNet-34 **$57.38\% \pm 12.60\%$**
   - **AJI Index (Instance-level):** Watershed **$0.3097 \pm 0.0723$** vs U-Net ResNet-34 **$0.2873 \pm 0.0645$**
   - **F1 Detection Score:** Watershed **$0.4101 \pm 0.0716$** vs U-Net ResNet-34 **$0.3508 \pm 0.0882$**

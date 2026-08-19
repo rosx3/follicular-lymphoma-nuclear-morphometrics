@@ -1,8 +1,10 @@
 # Fase 3 — Implementation Plan
 
-> **Stato: APPROVATO NELLE DECISIONI, NON ANCORA IN ESECUZIONE.**
-> Le decisioni D1–D7 (Sezione 2) sono state approvate il 19 agosto 2026.
-> Nessun task della Sezione 4 è stato avviato.
+> **Stato: IN ESECUZIONE.**
+> Decisioni D1–D7 (Sezione 2) approvate il 19 agosto 2026.
+> **Task 1–4 completati** (k-NN, tessitura, cablaggio e contratto, metadati FAIR).
+> Prossimo: Task 5 — esecuzione sulle 600 patch.
+> Durante il Task 1 è emersa ed è stata risolta la revisione della calibrazione spaziale (Sezione 4bis).
 
 **Obiettivo:** completare l'estrazione dei 47 biomarcatori citomorfometrici, micro-spaziali e di tessitura dalle 600 patch, eseguirla sull'intero dataset e quantificare la separabilità statistica FL vs REACTIVE.
 
@@ -23,12 +25,13 @@
 |---|---|
 | `03_feature_extraction.py` STEP 1 — morfometria per nucleo | ✅ implementato |
 | `03_feature_extraction.py` STEP 2 — aggregazione per patch (32 col) | ✅ implementato |
-| `03_feature_extraction.py` STEP 3 — k-NN | ❌ `NotImplementedError` |
-| `03_feature_extraction.py` STEP 4 — tessitura | ❌ `NotImplementedError` |
-| `run_fase3` — cablaggio STEP 3/4 e metadata JSON | ❌ assenti |
+| `03_feature_extraction.py` STEP 3 — k-NN | ✅ implementato (Task 1) |
+| `03_feature_extraction.py` STEP 4 — tessitura | ✅ implementato (Task 2) |
+| `run_fase3` — cablaggio STEP 3/4 | ✅ fatto (Task 3) |
+| `run_fase3` — metadata JSON | ✅ fatto (Task 4) |
 | `data/fase3_features/` | ❌ mai generata |
 | `reports/fase3_report.md` §3 (risultati) e §4 (figure) | ❌ vuote |
-| Feature attualmente prodotte | 37 / 47 |
+| Feature attualmente prodotte | 47 / 47, cablate e verificate dal contratto |
 
 **Prerequisiti già chiusi** (audit di apertura Fase 3, sezione di fix completata il 19 agosto 2026):
 
@@ -41,7 +44,7 @@
 | — | `requirements.txt` disallineato dall'ambiente reale | ✅ pin esatti verificati |
 | — | `run_pipeline.py --fase 1` in crash (`fit()` riceveva un path) | ✅ corretto |
 
-Verifica: **39 test** verdi (`python -m pytest tests/ -q`), di cui 5 di integrazione che eseguono Fase 1 → 2 → 3 su un mini-dataset temporaneo.
+Verifica: suite `pytest` interamente verde (`python -m pytest tests/ -q`), di cui 5 test di integrazione che eseguono Fase 1 → 2 → 3 su un mini-dataset temporaneo, e test di regressione che impediscono di ridefinire la calibrazione fuori da `src/calibration.py`.
 
 ---
 
@@ -101,7 +104,7 @@ L'estrazione (Task 1–5) resta su `csv` della standard library; l'analisi e le 
 **Contesto da documentare:** la proposta di tesi approvata richiede esplicitamente al punto 4 del workflow metodologico la triangolazione di Delaunay, il Minimum Spanning Tree, il k-NN con k=5 e i momenti cromatici CIE-LAB. La loro esclusione è quindi una **divergenza consapevole rispetto al documento approvato**, non un'omissione, e come tale va dichiarata.
 
 **Motivazioni** (già in `reports/fase3_report.md` §1.1 e §7):
-- Delaunay/MST: boundary effects critici su patch da 51.5 µm — il grafo viene troncato ai quattro bordi e nuclei biologicamente adiacenti ma su patch diverse risultano disconnessi. Sono strumenti validi alla scala della WSI (ordine dei mm), non della micro-patch.
+- Delaunay/MST: boundary effects critici su patch da 103.0 µm — il grafo viene troncato ai quattro bordi e nuclei biologicamente adiacenti ma su patch diverse risultano disconnessi. Sono strumenti validi alla scala della WSI (ordine dei mm), non della micro-patch.
 - k=5: ridondante con k=3 alla scala micro-locale del dataset.
 - CIE-LAB: ridondanti dopo la normalizzazione di Macenko, il cui scopo è proprio portare tutte le patch nello stesso spazio cromatico.
 
@@ -113,7 +116,7 @@ L'estrazione (Task 1–5) resta su `csv` della standard library; l'analisi e le 
 
 Valgono per ogni task; non vanno ripetuti nei singoli task ma sono parte implicita dei loro requisiti.
 
-- **Calibrazione spaziale:** 1 px = 0.23 µm; area pixel = 0.0529 µm²; patch 224×224 px = 2654.31 µm². Costanti già in `src/03_feature_extraction.py`, non ridefinirle.
+- **Calibrazione spaziale:** 1 px = 0.46 µm; area pixel = 0.2116 µm²; patch 224×224 px = 103.04 µm di lato, 10617.24 µm². Costanti in `src/calibration.py`, unica fonte di verità: importarle da lì, mai ridefinirle (i test lo verificano).
 - **Unità fisiche:** ogni feature dimensionale è espressa in µm o µm², mai in pixel, nel CSV per patch. Le colonne in pixel restano solo nel CSV per singolo nucleo, a fini di audit.
 - **Contratto di output:** `features_patches_master.csv` = 600 righe × 50 colonne (47 feature + `image_name`, `category`, `target`).
 - **Categorie:** solo `follicular_lymphoma` / `reactive_tissue` (D6). Usare `src/naming.py`, mai stringhe letterali.
@@ -688,7 +691,7 @@ git commit -m "feat(fase3): cablaggio k-NN e tessitura in run_fase3 con contratt
 {
   "fase": 3,
   "generato_il": "<ISO 8601>",
-  "calibrazione": {"microns_per_pixel": 0.23, "patch_size_px": 224, "patch_area_um2": 2654.31},
+  "calibrazione": {"microns_per_pixel": 0.46, "patch_size_px": 224, "patch_area_um2": 10617.24},
   "conteggi": {"patch_processate": 600, "patch_in_errore": 0, "nuclei_totali": 94042},
   "feature": {"n_feature": 47, "n_metadati": 3, "colonne": ["..."]},
   "parametri_glcm": {"levels": 64, "distances": [1], "angles_deg": [0, 45, 90, 135], "mascherato_sui_nuclei": true},
@@ -716,7 +719,7 @@ def test_fase3_writes_a_reproducible_metadata_file(pipeline):
     assert metadata["feature"]["n_feature"] == 47
     assert metadata["parametri_glcm"]["levels"] == 64
     assert metadata["parametri_glcm"]["mascherato_sui_nuclei"] is True
-    assert metadata["calibrazione"]["microns_per_pixel"] == 0.23
+    assert metadata["calibrazione"]["microns_per_pixel"] == 0.46
 ```
 
 - [ ] **Step 2: eseguire e verificare il fallimento**
@@ -850,6 +853,23 @@ Il punto §1.1/§7 su D7 è quello che verrà riportato nella tesi: deve dire es
 git add reports README.md
 git commit -m "docs(fase3): risultati, figure e motivazione delle esclusioni metodologiche"
 ```
+
+---
+
+## 4bis. Questione emersa durante il Task 1 — RISOLTA
+
+**Anomalia sulla calibrazione spaziale** — documentata per esteso in `reports/fase3_report.md` §3.4.
+
+Misurando le distanze k-NN su dati reali è emerso che il diametro nucleare medio risulta di **2.48 µm**, contro i 6–7 µm attesi in letteratura per un nucleo linfoide. La Ground Truth concorda (2.51 µm), quindi non è un artefatto del Watershed — che anzi **sotto-rileva** (90% dei nuclei della GT), non sovra-segmenta.
+
+**Verifica sulla fonte primaria eseguita il 19 agosto 2026.** Carreras et al. (2025) dichiarano che le patch sono state esportate da NDP.view2 a **200× e 150 dpi**, e non menzionano mai un obiettivo 40×. Il valore 0.23 µm/px corrisponde invece all'obiettivo 40× (= 400× totali) del NanoZoomer S360. Nella notazione istopatologica 200× equivale all'**obiettivo 20×**, cioè **0.46 µm/px**. Né l'articolo né il record Zenodo pubblicano una scala esplicita.
+
+Due controlli indipendenti convergono su 0.46 µm/px: la densità nucleare diventa 14.505/mm² (letteratura: 10.000–20.000/mm² per tessuto linfoide; a 0.23 µm/px sarebbe 58.019/mm², impossibile), e il diametro nucleare corretto per la sotto-copertura del Watershed diventa ~6.2 µm (atteso per un linfocita).
+
+**Non blocca la Fase 3:** un fattore di scala globale non altera ordinamenti, test di separabilità né modelli ad albero. Invaliderebbe però l'interpretazione clinica assoluta e il confronto con le soglie di Iwamoto et al. (2024). La correzione è: lunghezze ×2, aree ×4, densità /4 — richiede solo di cambiare `MICRONS_PER_PIXEL` e rigenerare i CSV, non di rifare la segmentazione.
+
+- [x] **Decisione presa il 19 agosto 2026: adottato 0.46 µm/px.** Costante centralizzata in `src/calibration.py`, dati derivati ricalcolati, report aggiornati. Spiegazione discorsiva per la tesi in `reports/fase1_report.md`; dettaglio tecnico in `reports/fase3_report.md` §3.4.
+- [ ] Conferma definitiva contattando gli autori dello studio sorgente, oppure misurando una struttura di dimensione nota
 
 ---
 

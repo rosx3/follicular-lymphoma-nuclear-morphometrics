@@ -4,7 +4,7 @@ Modulo 01: Preprocessing delle Immagini Istologiche (H&E)
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Reattivo
 ===============================================================================
 Questo modulo gestisce:
- 1. Calibrazione spaziale (1 px = 0.23 µm)
+ 1. Calibrazione spaziale (importata da src/calibration.py)
  2. Stain Normalization H&E con Macenko (SVD in Densità Ottica)
     - Selezione automatica della Reference Image più rappresentativa del dataset
  3. Denoising con Filtro Bilaterale (bordi nucleari preservati)
@@ -41,14 +41,20 @@ import numpy as np
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Costante di calibrazione spaziale
-# Scanner: Hamamatsu NanoZoomer S360, Obiettivo 40x
+# Calibrazione spaziale — unica fonte di verità in src/calibration.py
 # ---------------------------------------------------------------------------
-MICRONS_PER_PIXEL = 0.23          # µm / px
-PIXEL_AREA_UM2    = MICRONS_PER_PIXEL ** 2  # µm² / px²
-PATCH_SIZE_PX     = 224
-PATCH_SIZE_UM     = PATCH_SIZE_PX * MICRONS_PER_PIXEL  # 51.52 µm
-PATCH_AREA_UM2    = PATCH_SIZE_UM ** 2                  # 2654.31 µm²
+import sys  # noqa: E402
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from calibration import (  # noqa: E402,F401
+    MICRONS_PER_PIXEL,
+    PATCH_AREA_UM2,
+    PATCH_SIDE_UM as PATCH_SIZE_UM,
+    PATCH_SIZE_PX,
+    PIXEL_AREA_UM2,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -283,8 +289,9 @@ def extract_hematoxylin_channel_clahe(img_rgb, clip_limit=2.0, tile_grid_size=(8
     nuclei cellulari (ricchi di Ematossilina) appaiono come picchi brillanti
     su un fondo scuro — formato ideale per la segmentazione con StarDist/U-Net.
 
-    Calibrazione: 1 tile CLAHE = (224/8)×(224/8) px = 28×28 px ≈ 6.4×6.4 µm²
-    (scala confrontabile con la dimensione di un nucleo linfocitario: 5–10 µm).
+    Calibrazione: 1 tile CLAHE = (224/8)×(224/8) px = 28×28 px ≈ 12.9×12.9 µm²
+    (scala confrontabile con quella di un nucleo linfocitario, 5–10 µm, e con
+    il suo immediato intorno).
 
     Reference: Ruifrok AC & Johnston DA (2001). Anal. Quant. Cytol. Histol. 23(4):291-9.
 

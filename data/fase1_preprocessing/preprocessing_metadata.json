@@ -12,10 +12,11 @@
     "3. Ruifrok Color Deconvolution + CLAHE (clipLimit=2.0, tileGrid=8x8)"
   ],
   "calibration": {
-    "microns_per_pixel": 0.23,
+    "microns_per_pixel": 0.46,
     "patch_size_px": 224,
-    "patch_size_um": 51.52,
-    "patch_area_um2": 2654.3104000000003
+    "patch_size_um": 103.04,
+    "patch_area_um2": 10617.2416,
+    "provenance": "Carreras et al. 2025: export NDP.view2 a 200x = obiettivo 20x. Vedi src/calibration.py e reports/fase3_report.md 3.4"
   },
   "macenko_params": {
     "Io": 255,

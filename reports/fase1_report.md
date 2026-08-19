@@ -15,14 +15,121 @@ Trasformare le 600 patch H&E grezze in due rappresentazioni standardizzate:
 
 ## Calibrazione Spaziale
 
-| Parametro | Valore | Riferimento Bibliografico |
-|-----------|--------|---------------------------|
-| **Scanner** | Hamamatsu NanoZoomer S360 (40×) | Carreras et al., *Cancers* (2025) |
-| **Scala Spaziale** | **1 px = 0.23 µm** | Carreras et al., *Cancers* (2025) |
-| **Dimensione Patch** | 224 × 224 px = **51.52 × 51.52 µm** | Carreras et al., *Cancers* (2025) |
-| **Area per Patch** | **2.654,31 µm²** | Calcolo analitico |
+| Parametro | Valore | Riferimento |
+|-----------|--------|-------------|
+| **Scanner** | Hamamatsu NanoZoomer S360 C13220-01 | Carreras et al., *Cancers* (2025) |
+| **Esportazione patch** | NDP.view2, 200× (= obiettivo 20×), 150 dpi | Carreras et al., *Cancers* (2025) |
+| **Scala Spaziale** | **1 px = 0.46 µm** | Dedotta — vedi sezione successiva |
+| **Dimensione Patch** | 224 × 224 px = **103.04 × 103.04 µm** | Calcolo analitico |
+| **Area per Patch** | **10.617,24 µm²** | Calcolo analitico |
 
 Tutti i biomarcatori delle fasi successive (area nucleare, perimetro, distanze inter-nucleari) sono espressi in **unità fisiche reali (µm, µm²)** per garantire interpretabilità clinica immediata e confrontabilità con la letteratura istopatologica (*Iwamoto et al., 2024*).
+
+La costante è definita in un unico punto del codice, [`src/calibration.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/calibration.py), da cui tutti i moduli la importano.
+
+---
+
+## Come è stata determinata la scala spaziale
+
+> **Nota (19 agosto 2026).** Fino a questa revisione il progetto usava 1 px = 0.23 µm.
+> Quel valore si è rivelato errato. Questa sezione ricostruisce come ce ne siamo accorti
+> e come siamo arrivati a quello attuale, perché il ragionamento è parte del metodo e
+> va riportato nella tesi.
+
+### 1. Un controllo di routine che non tornava
+
+Durante l'implementazione delle distanze inter-nucleari della Fase 3, i biomarcatori
+sono stati confrontati con i valori attesi in letteratura. Con la calibrazione di
+0.23 µm/px i nuclei risultavano avere un diametro medio di **2,5 µm**. Un nucleo di
+linfocita ne misura 6–7.
+
+### 2. Non era colpa della segmentazione
+
+Il primo sospetto era un difetto del nostro Watershed. È stato quindi confrontato il
+diametro medio contro la Ground Truth, prodotta in modo indipendente: **2,51 µm**,
+praticamente identico al nostro (2,48 µm).
+
+Se anche il riferimento indipendente misura nuclei della stessa dimensione anomala,
+il problema non è nell'algoritmo di segmentazione: è nei dati o nella loro interpretazione.
+
+### 3. Il conto che rendeva l'errore certo
+
+A questo punto sono stati messi insieme tre numeri:
+
+- **154 nuclei** per patch — misurati da noi
+- **≈33 µm²** l'area di un nucleo linfoide — valore di letteratura
+- **2.654 µm²** l'area del campo visivo — conseguenza della calibrazione di 0.23 µm/px
+
+Moltiplicando: `154 × 33 = 5.148 µm²` di nuclei da collocare in `2.654 µm²` di spazio
+disponibile, cioè il **194%**. I nuclei avrebbero dovuto occupare quasi il doppio dello
+spazio esistente.
+
+Non è un risultato improbabile: è impossibile. Almeno uno dei tre numeri doveva essere
+sbagliato.
+
+### 4. Quale dei tre
+
+Il conteggio dei nuclei è una misura diretta. La dimensione dei nuclei è un dato
+consolidato. Il terzo numero, l'area del campo visivo, **non è una misura**: è una
+conseguenza della calibrazione, che a sua volta era un'assunzione.
+
+A confermare la direzione del sospetto c'è un fatto: alcune grandezze **non dipendono
+affatto dalla calibrazione**, perché sono rapporti fra conteggi di pixel. La frazione
+di area della patch occupata dai nuclei è una di queste, e vale **31,3%** — un valore
+del tutto normale per un tessuto.
+
+I pixel, quindi, raccontano una storia coerente. È la conversione da pixel a micron
+a essere sbagliata.
+
+### 5. Cosa dice davvero l'articolo sorgente
+
+I 0.23 µm/px derivavano dal ragionamento: *scanner NanoZoomer S360 + obiettivo 40×
+→ 0.23 µm/px*. Corretto come specifica tecnica dello scanner, ma rileggendo
+Carreras et al. (2025) emerge che **l'obiettivo 40× non è mai nominato**. Gli autori
+scrivono di aver convertito le immagini in JPEG a **200× e 150 dpi** tramite NDP.view2.
+
+In istopatologia l'ingrandimento si esprime come prodotto obiettivo × oculare, dove
+l'oculare è convenzionalmente 10×. Quindi:
+
+| Notazione dell'articolo | Obiettivo corrispondente | Risoluzione |
+|---|---|---|
+| 400× (usato per alcune figure) | 40× | 0.23 µm/px — nativa dello scanner |
+| **200× (usato per le patch)** | **20×** | **0.46 µm/px** |
+
+Le patch sono state esportate a metà risoluzione. Il valore che stavamo usando era
+quello corretto per un ingrandimento che non è stato impiegato per generarle.
+
+### 6. La verifica indipendente
+
+Una spiegazione plausibile non basta. Serviva un controllo che non fosse già stato
+usato per arrivare alla conclusione: la **densità nucleare per millimetro quadro**,
+grandezza ben documentata per il tessuto linfoide (**10.000–20.000 nuclei/mm²**).
+
+| Calibrazione ipotizzata | Densità risultante | Esito |
+|---|---|---|
+| 0.23 µm/px (precedente) | 58.019 /mm² | impossibile |
+| **0.46 µm/px (adottata)** | **14.505 /mm²** | **in intervallo** |
+| 0.847 µm/px (lettura alternativa) | 4.282 /mm² | troppo rado per un centro germinativo |
+
+Solo un valore regge, ed è lo stesso a cui porta la lettura dell'articolo. Il diametro
+conferma: 4,96 µm misurati che, corretti per la sotto-copertura del Watershed
+(Dice 0,637 rispetto alla Ground Truth), portano a **≈6,2 µm**.
+
+### 7. Cosa resta incerto
+
+Gli autori **non pubblicano una scala esplicita**, né nell'articolo né nel record
+Zenodo, e i JPEG riportano solo una densità JFIF generica di 96 dpi scritta al momento
+del ritaglio. Il valore di 0.46 µm/px è quindi una **deduzione ben sostenuta da due
+verifiche convergenti**, non un dato letto dalla fonte. Nella tesi va presentato come
+tale. Una conferma definitiva richiederebbe di contattare gli autori o di misurare una
+struttura di dimensione nota.
+
+**Impatto della revisione.** Trattandosi di un fattore di scala globale, la correzione
+è lineare sulle lunghezze (×2) e quadratica sulle aree (×4). Non altera ordinamenti fra
+patch, test di separabilità né prestazioni dei modelli: cambia l'interpretazione
+clinica assoluta e la confrontabilità con le soglie dimensionali della letteratura.
+Le grandezze adimensionali (circolarità, eccentricità, solidità, aspect ratio,
+coefficienti di variazione, tessitura, frazioni di area) non sono toccate.
 
 ---
 
@@ -42,7 +149,7 @@ Immagine Raw RGB (224×224 px)
         ▼
 [ Step 3 ] Deconvoluzione Cromatica (Ruifrok & Johnston, 2001) + CLAHE
            Separa il canale Ematossilina dall'Eosina in spazio OD.
-           CLAHE (clipLimit=2.0, tile 28×28 px = 6.4 µm) aumenta
+           CLAHE (clipLimit=2.0, tile 28×28 px = 12.9 µm) aumenta
            il contrasto locale della cromatina nucleare.
 ```
 
@@ -64,7 +171,7 @@ Immagine Raw RGB (224×224 px)
 ### 3. Deconvoluzione Cromatica di Ruifrok & CLAHE Adattivo
 * **Scelta:** Deconvoluzione Ruifrok & Johnston seguita da CLAHE su griglia 8×8.
 * **Riferimenti:** **Ruifrok & Johnston (2001)** — *Anal. Quant. Cytol. Histol.* 23(4):291-9.
-* **Motivazione Scientifica:** La matrice di deconvoluzione Ruifrok disaccoppia matematicamente il segnale dell'Ematossilina (nuclei) da quello dell'Eosina (citoplasma). Il CLAHE adattivo applicato su tile di 28×28 px (~6.4 × 6.4 µm²) opera alla stessa scala spaziale dei nuclei linfocitari (5–10 µm), aumentando il contrasto della cromatina nucleare senza amplificare il rumore stromatico globale (*Sung et al., 2024*).
+* **Motivazione Scientifica:** La matrice di deconvoluzione Ruifrok disaccoppia matematicamente il segnale dell'Ematossilina (nuclei) da quello dell'Eosina (citoplasma). Il CLAHE adattivo applicato su tile di 28×28 px (~12.9 × 12.9 µm²) opera a una scala spaziale confrontabile con quella di un nucleo linfocitario (5–10 µm) e del suo immediato intorno, aumentando il contrasto della cromatina nucleare senza amplificare il rumore stromatico globale (*Sung et al., 2024*).
 
 ---
 

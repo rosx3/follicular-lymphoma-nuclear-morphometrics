@@ -58,10 +58,10 @@ data/fase2_segmentation/
 | `nucleus_id` | Int | Identificativo numerico unico del nucleo nella patch ($1 \dots N$) |
 | `centroid_y_px` | Float | Coord Y centroide in pixel ($0 \dots 223$) |
 | `centroid_x_px` | Float | Coord X centroide in pixel ($0 \dots 223$) |
-| `centroid_y_um` | Float | Coord Y centroide in micron ($0 \dots 51.52 \ \mu\text{m}$) |
-| `centroid_x_um` | Float | Coord X centroide in micron ($0 \dots 51.52 \ \mu\text{m}$) |
+| `centroid_y_um` | Float | Coord Y centroide in micron ($0 \dots 103.04 \ \mu\text{m}$) |
+| `centroid_x_um` | Float | Coord X centroide in micron ($0 \dots 103.04 \ \mu\text{m}$) |
 | `area_px` | Int | Area del nucleo in pixel |
-| `area_um2` | Float | Area reale del nucleo in $\mu\text{m}^2$ ($1 \text{ px}^2 = 0.0529 \ \mu\text{m}^2$) |
+| `area_um2` | Float | Area reale del nucleo in $\mu\text{m}^2$ ($1 \text{ px}^2 = 0.2116 \ \mu\text{m}^2$) |
 
 ---
 

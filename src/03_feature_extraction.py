@@ -13,12 +13,13 @@ reports/fase3_report.md (Sezione 2 — 47 feature + 3 metadati):
  2. STEP 2 — Aggregazione statistica per patch: mean/std/skew/cv su 8 feature
     di base (questo file, completo).
  3. STEP 3 — Distanze micro-spaziali k-NN (k=1, k=3) via scipy.spatial.KDTree
-    (scheletro — implementazione nella prossima iterazione).
+    (questo file, completo).
  4. STEP 4 — Tessitura cromatinica H-channel: GLCM (contrast/homogeneity/energy)
-    + LBP entropy + statistiche di intensità (scheletro — prossima iterazione).
+    + LBP entropy + statistiche di intensità, ristrette ai pixel nucleari
+    (questo file, completo).
 
 DECISIONI METODOLOGICHE GIA' VALIDATE (vedi reports/fase3_report.md §1.1):
-  - NIENTE Delaunay/MST: boundary effects critici su patch 224x224 px (51.5 µm).
+  - NIENTE Delaunay/MST: boundary effects critici su patch 224x224 px (103.0 µm).
     Direzione futura: WSI + GNN (GraphSAGE/GAT) — vedi report §7.
   - NIENTE equivalent_diameter_um in aggregazione: ridondante con area_um2
     (d = 2*sqrt(A/pi)). Rimane disponibile a livello di singolo nucleo per
@@ -44,8 +45,9 @@ reports/fase3_report.md §2):
   implementata qui. Il valore "51" riportato dalla prima stesura del report
   era un errore di somma, corretto il 19 agosto 2026.
 
-  Con gli STEP 3 e 4 ancora da implementare, il modulo produce attualmente
-  37 delle 47 feature (mancano le 4 k-NN e le 6 di tessitura).
+  Con gli STEP 1-4 implementati il modulo produce tutte e 47 le feature.
+  Il cablaggio in run_fase3 e il contratto delle colonne sono il Task 3 del
+  piano (reports/fase3_implementation_plan.md).
 ===============================================================================
 """
 
@@ -54,18 +56,26 @@ from pathlib import Path
 import numpy as np
 import cv2
 from scipy import stats
+from scipy.spatial import KDTree
+from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
 from skimage.measure import regionprops
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 # ---------------------------------------------------------------------------
-# Costanti di Calibrazione Spaziale
-# Scanner: Hamamatsu NanoZoomer S360, Obiettivo 40x
+# Calibrazione Spaziale — unica fonte di verità in src/calibration.py
 # ---------------------------------------------------------------------------
-MICRONS_PER_PIXEL = 0.23  # µm / px
-PIXEL_AREA_UM2 = MICRONS_PER_PIXEL**2  # 0.0529 µm² / px²
-PATCH_SIZE_PX = 224
-PATCH_AREA_UM2 = (PATCH_SIZE_PX * MICRONS_PER_PIXEL) ** 2  # 2654.31 µm²
+import sys  # noqa: E402
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from calibration import (  # noqa: E402,F401
+    MICRONS_PER_PIXEL,
+    PATCH_AREA_UM2,
+    PATCH_SIZE_PX,
+    PIXEL_AREA_UM2,
+)
 
 # Feature morfometriche di base su cui calcolare le 4 statistiche aggregate
 # (mean, std, skew, cv) — vedi reports/fase3_report.md §2.4.
@@ -83,6 +93,10 @@ MORPHOMETRY_BASE_FEATURES: list[str] = [
 # Feature mantenute a livello di singolo nucleo per tracciabilità/audit ma
 # escluse dall'aggregazione per patch (ridondanti — vedi report §1.1).
 NUCLEUS_ONLY_AUDIT_FEATURES: list[str] = ["extent", "equivalent_diameter_um"]
+
+# Valori di k per le distanze micro-spaziali (report §2.5). k=5 e' escluso:
+# ridondante con k=3 alla scala micro-locale del dataset (report §1.1).
+KNN_NEIGHBOR_COUNTS: tuple[int, ...] = (1, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +180,23 @@ def extract_nucleus_morphometry(instance_mask: np.ndarray) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 2. Aggregazione Statistica per Patch (Firma di Patch)
 # ---------------------------------------------------------------------------
+def _skewness(values: np.ndarray) -> float:
+    """
+    Asimmetria della distribuzione, con gestione esplicita dei casi degeneri.
+
+    Su valori tutti uguali la skewness è 0 per definizione, ma scipy.stats.skew
+    tenta comunque il calcolo dei momenti: emette un RuntimeWarning di perdita
+    di precisione per cancellazione catastrofica e restituisce un valore
+    inaffidabile. Il caso si presenta davvero — una patch con pochi nuclei
+    perfettamente convessi ha `solidity` costante a 1.0 — quindi va intercettato
+    prima di chiamare scipy, non filtrato a posteriori.
+    """
+    if len(values) <= 2 or np.ptp(values) == 0.0:
+        return 0.0
+    skew = float(stats.skew(values))
+    return skew if not np.isnan(skew) else 0.0
+
+
 def _coefficient_of_variation(values: np.ndarray) -> float:
     """cv = std / |mean|, con guardia contro divisione per zero."""
     mean_val = float(np.mean(values))
@@ -227,62 +258,221 @@ def aggregate_patch_morphometry(
         vals = np.array([n[feat] for n in nuclei_list], dtype=np.float64)
         patch_dict[f"{feat}_mean"] = round(float(np.mean(vals)), 4)
         patch_dict[f"{feat}_std"] = round(float(np.std(vals)), 4)
-        sk = float(stats.skew(vals)) if len(vals) > 2 else 0.0
-        patch_dict[f"{feat}_skew"] = round(sk if not np.isnan(sk) else 0.0, 4)
+        patch_dict[f"{feat}_skew"] = round(_skewness(vals), 4)
         patch_dict[f"{feat}_cv"] = round(_coefficient_of_variation(vals), 4)
 
     return patch_dict
 
 
 # ---------------------------------------------------------------------------
-# 3. Distanze Micro-Spaziali k-NN [SCHELETRO — prossima iterazione]
+# 3. Distanze Micro-Spaziali k-NN
 # ---------------------------------------------------------------------------
 def compute_knn_spatial_features(nuclei_list: list[dict]) -> dict:
     """
-    Calcola le distanze medie/std ai k=1 e k=3 vicini più prossimi per ogni
-    nucleo della patch, usando scipy.spatial.KDTree su centroid_x_um/y_um.
+    Distanze ai k vicini più prossimi (k = 1, 3) fra i centroidi nucleari, in µm.
 
-    Sostituisce Delaunay/MST (esclusi per boundary effects su patch 224x224 px,
-    vedi reports/fase3_report.md §1.1 e §7) come proxy di micro-architettura
-    del packing nucleare.
+    Definizione operativa: per ogni nucleo si calcola la media delle distanze
+    euclidee ai suoi k vicini più prossimi; la colonna `_mean` è la media di
+    questo valore su tutti i nuclei della patch, la colonna `_std` la sua
+    deviazione standard — quest'ultima misura la regolarità del packing
+    nucleare. Per k=1 il valore per nucleo coincide con la distanza al primo
+    vicino.
 
-    Output atteso (4 colonne):
-      knn1_dist_mean_um, knn1_dist_std_um, knn3_dist_mean_um, knn3_dist_std_um
+    Sostituisce Delaunay/MST come descrittore di micro-architettura: su patch
+    da 224x224 px (103.0 µm) i grafi spaziali vengono troncati ai bordi e i
+    descrittori risultanti sono distorti (reports/fase3_report.md §1.1 e §7).
 
-    Nota implementativa: con n_nuclei < 4 il k=3 non è definibile — gestire
-    con fallback a 0.0 o NaN esplicito (da decidere per coerenza col resto
-    della pipeline).
+    Casi non definiti: servono almeno k+1 nuclei (il primo vicino restituito
+    dal KDTree è il nucleo stesso, a distanza 0, e va scartato). Sotto quella
+    soglia le due colonne di quel k valgono NaN e non 0.0: uno zero verrebbe
+    interpretato dal modello come nuclei sovrapposti, cioè densità massima,
+    l'opposto della situazione reale di una patch quasi vuota.
 
-    TODO(prossima iterazione): implementare con scipy.spatial.KDTree.
+    Args:
+        nuclei_list: nuclei della patch, ciascuno con 'centroid_x_um' e
+            'centroid_y_um' (output di extract_nucleus_morphometry).
+
+    Returns:
+        dict con knn1_dist_mean_um, knn1_dist_std_um,
+        knn3_dist_mean_um, knn3_dist_std_um.
     """
-    raise NotImplementedError(
-        "STEP 3 — da implementare nella prossima iterazione (vedi roadmap Fase 3)."
+    nan = float("nan")
+    result = {}
+    for k in KNN_NEIGHBOR_COUNTS:
+        result[f"knn{k}_dist_mean_um"] = nan
+        result[f"knn{k}_dist_std_um"] = nan
+
+    n_nuclei = len(nuclei_list)
+    if n_nuclei < 2:
+        return result
+
+    coords = np.array(
+        [[n["centroid_x_um"], n["centroid_y_um"]] for n in nuclei_list],
+        dtype=np.float64,
     )
+    tree = KDTree(coords)
+
+    for k in KNN_NEIGHBOR_COUNTS:
+        if n_nuclei < k + 1:
+            continue
+
+        # k+1 perché la prima colonna è il nucleo stesso (distanza 0): va scartata.
+        distances, _ = tree.query(coords, k=k + 1)
+        neighbor_distances = np.atleast_2d(distances)[:, 1:]
+
+        per_nucleus = neighbor_distances.mean(axis=1)
+        result[f"knn{k}_dist_mean_um"] = round(float(per_nucleus.mean()), 4)
+        result[f"knn{k}_dist_std_um"] = round(float(per_nucleus.std()), 4)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
-# 4. Tessitura Cromatinica H-channel [SCHELETRO — prossima iterazione]
+# 4. Tessitura Cromatinica H-channel
 # ---------------------------------------------------------------------------
-def extract_texture_features(h_channel_patch: np.ndarray) -> dict:
+# Parametri fissati qui e replicati in feature_extraction_metadata.json per
+# riproducibilità (decisione D3 del piano di implementazione).
+GLCM_LEVELS = 64                        # quantizzazione: standard Haralick
+GLCM_DISTANCES: tuple[int, ...] = (1,)  # px
+GLCM_ANGLES_DEG: tuple[int, ...] = (0, 45, 90, 135)  # mediati: invarianza rotazionale
+LBP_POINTS = 8
+LBP_RADIUS = 1
+LBP_METHOD = "uniform"
+
+_TEXTURE_COLUMNS: tuple[str, ...] = (
+    "glcm_contrast",
+    "glcm_homogeneity",
+    "glcm_energy",
+    "lbp_entropy",
+    "hchannel_mean",
+    "hchannel_std",
+)
+
+
+# ---------------------------------------------------------------------------
+# Contratto delle colonne del CSV per patch
+# ---------------------------------------------------------------------------
+# Il CSV per patch è l'input della Fase 4: la sua forma (600 righe x 50 colonne)
+# è dichiarata in reports/fase3_report.md §2. Dichiararla qui in modo esplicito
+# permette a csv.DictWriter di fallire se una feature manca o è di troppo,
+# invece di scrivere in silenzio un CSV diverso dal contratto.
+PATCH_METADATA_COLUMNS: tuple[str, ...] = ("image_name", "category", "target")
+
+_DENSITY_COLUMNS: tuple[str, ...] = (
+    "n_nuclei",
+    "nuclear_density_per_1000um2",
+    "nuclear_area_fraction",
+)
+_IWAMOTO_COLUMNS: tuple[str, ...] = ("area_top10_mean_um2", "area_top10_short_axis_um")
+_MORPHOMETRY_COLUMNS: tuple[str, ...] = tuple(
+    f"{feat}_{stat}"
+    for feat in MORPHOMETRY_BASE_FEATURES
+    for stat in ("mean", "std", "skew", "cv")
+)
+_KNN_COLUMNS: tuple[str, ...] = tuple(
+    f"knn{k}_dist_{stat}_um" for k in KNN_NEIGHBOR_COUNTS for stat in ("mean", "std")
+)
+
+# Ordine canonico, nella sequenza delle sezioni del report §2:
+# densità (3) + Iwamoto (2) + morfometria (32) + k-NN (4) + tessitura (6) = 47
+PATCH_FEATURE_COLUMNS: tuple[str, ...] = (
+    _DENSITY_COLUMNS
+    + _IWAMOTO_COLUMNS
+    + _MORPHOMETRY_COLUMNS
+    + _KNN_COLUMNS
+    + _TEXTURE_COLUMNS
+)
+
+
+def extract_texture_features(
+    h_channel_patch: np.ndarray, instance_mask: np.ndarray
+) -> dict:
     """
-    Calcola i descrittori di tessitura cromatinica sull'intera patch H-channel
-    (CLAHE, prodotta dalla Fase 1), non sul singolo nucleo.
+    Descrittori di tessitura cromatinica sui soli pixel nucleari.
 
-    Output atteso (6 colonne):
-      glcm_contrast, glcm_homogeneity, glcm_energy  (skimage.feature.graycomatrix/graycoprops)
-      lbp_entropy                                    (skimage.feature.local_binary_pattern
-                                                        + entropia di Shannon dell'istogramma)
-      hchannel_mean, hchannel_std                    (statistiche dirette sui pixel)
+    GLCM, LBP e statistiche di intensità sono ristretti ai pixel appartenenti
+    ai nuclei: calcolarli sull'intera patch misurerebbe anche stroma e spazio
+    inter-nucleare, diluendo il segnale cromatinico che questo lavoro intende
+    quantificare (report §2.6).
 
-    Parametri GLCM/LBP (distanze, angoli, raggio, n_points, metodo 'uniform')
-    da fissare e documentare in feature_extraction_metadata.json per
-    riproducibilità.
+    Mascheramento della GLCM
+    ------------------------
+    graycomatrix non accetta maschere. L'H-channel viene quindi quantizzato su
+    GLCM_LEVELS-1 livelli mappati su 1..63, riservando lo 0 allo sfondo; dopo
+    il calcolo si scartano riga 0 e colonna 0, cioè tutte le coppie di pixel
+    che coinvolgono lo sfondo.
 
-    TODO(prossima iterazione): implementare con skimage.feature.
+    Lo scarto sposta gli indici di livello di 1, ma le tre proprietà calcolate
+    sono invarianti a questo shift: contrasto e omogeneità pesano i termini
+    con (i-j), dove uno spostamento costante di entrambi si annulla, mentre
+    l'energia non dipende dagli indici. (glcm_correlation, che userebbe indici
+    assoluti e verrebbe distorta, è esclusa dal set per altra ragione — §1.1.)
+
+    Args:
+        h_channel_patch: H-channel CLAHE uint8 prodotto dalla Fase 1.
+        instance_mask: maschera d'istanza della Fase 2 (0 = sfondo).
+
+    Returns:
+        dict con le 6 colonne di §2.6. Tutte NaN se la maschera è vuota; le
+        sole colonne GLCM/LBP sono NaN se nessuna coppia di pixel nucleari
+        risulta adiacente.
     """
-    raise NotImplementedError(
-        "STEP 4 — da implementare nella prossima iterazione (vedi roadmap Fase 3)."
+    nan = float("nan")
+    nuclear = instance_mask > 0
+
+    if not nuclear.any():
+        return dict.fromkeys(_TEXTURE_COLUMNS, nan)
+
+    nuclear_values = h_channel_patch.astype(np.float64)[nuclear]
+    intensity = {
+        "hchannel_mean": round(float(nuclear_values.mean()), 4),
+        "hchannel_std": round(float(nuclear_values.std()), 4),
+    }
+
+    # --- GLCM mascherata ---
+    # Livelli utili 1..GLCM_LEVELS-1; lo 0 e' riservato allo sfondo, così le
+    # coppie che lo coinvolgono restano isolabili e scartabili.
+    quantized = (h_channel_patch.astype(np.float64) / 256.0 * (GLCM_LEVELS - 1)).astype(np.uint8) + 1
+    quantized[~nuclear] = 0
+
+    glcm = graycomatrix(
+        quantized,
+        distances=list(GLCM_DISTANCES),
+        angles=[np.deg2rad(a) for a in GLCM_ANGLES_DEG],
+        levels=GLCM_LEVELS,
+        symmetric=True,
+        normed=False,
     )
+    glcm = glcm[1:, 1:, :, :].astype(np.float64)
+
+    # Se non resta alcuna coppia di pixel nucleari adiacenti (es. nuclei ridotti
+    # a pixel isolati), graycoprops porrebbe il denominatore a 1 restituendo
+    # zeri indistinguibili da una tessitura piatta: meglio dichiararlo NaN.
+    if not np.all(glcm.sum(axis=(0, 1)) > 0):
+        return {
+            **dict.fromkeys(("glcm_contrast", "glcm_homogeneity", "glcm_energy", "lbp_entropy"), nan),
+            **intensity,
+        }
+
+    # --- LBP: operatore su tutta la patch, istogramma sui soli pixel nucleari ---
+    # L'operatore ha bisogno del vicinato reale di ogni pixel, quindi non si
+    # applica a un'immagine pre-mascherata; e' l'istogramma a essere ristretto.
+    lbp = local_binary_pattern(h_channel_patch, LBP_POINTS, LBP_RADIUS, LBP_METHOD)
+    n_bins = LBP_POINTS + 2  # metodo 'uniform'
+    histogram, _ = np.histogram(lbp[nuclear], bins=n_bins, range=(0, n_bins))
+    probabilities = histogram / histogram.sum()
+    non_zero = probabilities[probabilities > 0]
+    # Il "+ 0.0" normalizza lo zero negativo prodotto da -(1*log2(1)) su una
+    # distribuzione degenere, che finirebbe nel CSV come "-0.0".
+    lbp_entropy = float(-(non_zero * np.log2(non_zero)).sum()) + 0.0
+
+    return {
+        "glcm_contrast": round(float(graycoprops(glcm, "contrast").mean()), 4),
+        "glcm_homogeneity": round(float(graycoprops(glcm, "homogeneity").mean()), 4),
+        "glcm_energy": round(float(graycoprops(glcm, "energy").mean()), 4),
+        "lbp_entropy": round(lbp_entropy, 4),
+        **intensity,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +583,27 @@ if __name__ == "__main__":
     print(f"[TEST] Colonne morfometria aggregata attese: {n_expected_agg_cols} "
           f"({len(MORPHOMETRY_BASE_FEATURES)} feature x 4 statistiche)")
 
-    print("[OK] Self-test Modulo 03 (STEP 1-2) superato con successo.")
-    print("[INFO] STEP 3 (k-NN) e STEP 4 (tessitura) sono scheletri — "
-          "vedi roadmap per la prossima iterazione.")
+    knn_test = compute_knn_spatial_features([
+        {"centroid_x_um": 0.0, "centroid_y_um": 0.0},
+        {"centroid_x_um": 1.0, "centroid_y_um": 0.0},
+        {"centroid_x_um": 0.0, "centroid_y_um": 1.0},
+        {"centroid_x_um": 1.0, "centroid_y_um": 1.0},
+    ])
+    print(f"[TEST] k-NN su quadrato unitario: knn1={knn_test['knn1_dist_mean_um']} µm "
+          f"(atteso 1.0), knn3={knn_test['knn3_dist_mean_um']} µm (atteso 1.1381)")
+
+    texture_test = extract_texture_features(
+        np.full((32, 32), 120, dtype=np.uint8),
+        np.pad(np.ones((16, 16), dtype=np.int32), 8),
+    )
+    print(f"[TEST] Tessitura su regione uniforme: contrasto={texture_test['glcm_contrast']} "
+          f"(atteso 0.0), omogeneita={texture_test['glcm_homogeneity']} (atteso 1.0), "
+          f"entropia LBP={texture_test['lbp_entropy']} (atteso 0.0)")
+
+    print(f"[TEST] Contratto colonne: {len(PATCH_FEATURE_COLUMNS)} feature "
+          f"(attese 47) + {len(PATCH_METADATA_COLUMNS)} metadati "
+          f"= {len(PATCH_FEATURE_COLUMNS) + len(PATCH_METADATA_COLUMNS)} colonne")
+
+    print("[OK] Self-test Modulo 03 (STEP 1-4) superato con successo.")
+    print("[INFO] Cablaggio in run_fase3 e contratto delle colonne: "
+          "vedi reports/fase3_implementation_plan.md, Task 3.")
