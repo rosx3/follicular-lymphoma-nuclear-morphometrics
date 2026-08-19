@@ -1,7 +1,7 @@
 # Report Fase 3 — Estrazione Biomarcatori Citomorfometrici, Spaziali e di Tessitura
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
 *Modulo: src/03_feature_extraction.py*
-*Aggiornato: 18 agosto 2026 — Pianificazione Fase 3*
+*Aggiornato: 19 agosto 2026 — Corretta discrepanza nel conteggio delle feature (vedi nota in Sezione 2)*
 
 ---
 
@@ -11,7 +11,7 @@ Tradurre le **94.042 maschere d-istanza nucleare** prodotte dalla Fase 2 e i **6
 
 Output:
 - data/fase3_features/features_nuclei_all.csv
-- data/fase3_features/features_patches_master.csv — 600 righe x 54 colonne
+- data/fase3_features/features_patches_master.csv — 600 righe x 50 colonne (47 feature + 3 metadati)
 - data/fase3_features/feature_extraction_metadata.json
 - img/fase3/morphometry_regions_preview.png
 
@@ -42,7 +42,18 @@ i boundary effects ne compromettono l-affidabilita. Questa e una direzione futur
 
 ---
 
-## 2. Set Definitivo dei Biomarcatori (51 feature + 3 metadati)
+## 2. Set Definitivo dei Biomarcatori (47 feature + 3 metadati)
+
+> **NOTA DI CORREZIONE (19 agosto 2026):** la versione precedente di questa sezione dichiarava
+> erroneamente "51 feature". La tabella dettagliata di §2.4 elencava conteggi disomogenei per
+> feature (somma reale: 19 colonne, non 32), mentre il testo introduttivo della stessa sezione
+> dichiarava l'applicazione uniforme di 4 statistiche (mean/std/skew/cv) a tutte le 8 feature di
+> base (8×4 = 32 colonne). Anche usando 32 (l'interpretazione effettivamente implementata in
+> `src/03_feature_extraction.py` e verificata con self-test), la somma dei sub-totali di sezione
+> (3 + 2 + 32 + 4 + 6) da **47**, non 51. Si è deciso di correggere il totale dichiarato a 47
+> anziché aggiungere feature non pianificate, per mantenere il set minimale e motivato descritto
+> in Sezione 1. La tabella di §2.4 sotto è stata aggiornata per riflettere il conteggio uniforme
+> (4 colonne per ciascuna delle 8 feature di base) realmente implementato nel codice.
 
 ### 2.1 Metadati (3 colonne)
 | Colonna | Tipo | Descrizione |
@@ -67,16 +78,16 @@ i boundary effects ne compromettono l-affidabilita. Questa e una direzione futur
 ### 2.4 Morfometria Aggregata per Patch (32 colonne)
 Aggregati: _mean, _std, _skew, _cv per 8 feature di base:
 
-| Feature di Base | Unita | N col | Fonte Clinica |
+| Feature di Base | Unita | N col (mean/std/skew/cv) | Fonte Clinica |
 |---|---|---|---|
 | area_um2 | um2 | 4 | Iwamoto et al. (2024), p=0.013 |
-| perimeter_um | um | 2 | Standard morfometria |
-| circularity | [0,1] | 3 (mean/std/skew) | Centrociti = bassa circolarita |
-| eccentricity | [0,1] | 2 | Allungamento centrociti |
-| solidity | [0,1] | 2 | Concavita nucleari |
-| major_axis_um | um | 2 | Iwamoto et al. (2024) long length, p=0.042 |
-| minor_axis_um | um | 2 | Iwamoto et al. (2024) short length, p=0.007 |
-| aspect_ratio | adim. | 2 | Rapporto forma major/minor |
+| perimeter_um | um | 4 | Standard morfometria |
+| circularity | [0,1] | 4 | Centrociti = bassa circolarita |
+| eccentricity | [0,1] | 4 | Allungamento centrociti |
+| solidity | [0,1] | 4 | Concavita nucleari |
+| major_axis_um | um | 4 | Iwamoto et al. (2024) long length, p=0.042 |
+| minor_axis_um | um | 4 | Iwamoto et al. (2024) short length, p=0.007 |
+| aspect_ratio | adim. | 4 | Rapporto forma major/minor |
 
 ### 2.5 Distanze k-NN (4 colonne)
 | Feature | Unita | Descrizione |
@@ -107,7 +118,7 @@ Aggregati: _mean, _std, _skew, _cv per 8 feature di base:
 |---|---|
 | Patch processate | — / 600 |
 | Nuclei elaborati | — / 94.042 |
-| Feature estratte per patch | 51 |
+| Feature estratte per patch | 47 (+ 3 metadati) |
 | Valori NaN | — |
 | Errori di processamento | — |
 | Tempo di esecuzione | — s |

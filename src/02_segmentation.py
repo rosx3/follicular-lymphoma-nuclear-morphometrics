@@ -2,7 +2,8 @@
 ===============================================================================
 Modulo 02: Segmentazione dei Nuclei Cellulari & Estrazione Centroidi
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Reattivo
-Versione: 4.0 — Audit & Fix (agosto 2026)
+Versione: 4.2 — Esito benchmark h_maxima: default riportato a relative_threshold
+              (agosto 2026)
 ===============================================================================
 Questo modulo gestisce:
  1. Segmentazione d'istanza dei nuclei con Marker-Controlled Watershed +
@@ -21,6 +22,33 @@ NOTA METODOLOGICA (limitazione riconosciuta):
   Una validazione rigorosa richiederebbe annotazioni manuali su almeno un subset
   (es. MoNuSeg benchmark) o un split train/val fisicamente separato dalla GT.
   Questo limite va dichiarato esplicitamente nella sezione "Limitazioni" della tesi.
+
+STORIA DELLA RILEVAZIONE MARKER (v4.1 → v4.2, 19/08/2026):
+  v4.1 — Una code review aveva evidenziato che la soglia marker storica è
+  GLOBALE e relativa al massimo della distance map dell'INTERA patch
+  (`distance.max() * 0.15`): può quindi sopprimere il marker di nuclei piccoli
+  quando la stessa patch contiene un blob molto più grande. Verificata su casi
+  sintetici (collasso a 0/10 nuclei per blob > ~87px di raggio) e su 40 patch
+  reali (perdita ~3%, perché dist.max() reale è solo 6-13px). Come rimedio era
+  stata adottata come default la trasformata h-maxima (Vincent, 1993), criterio
+  di prominenza LOCALE/assoluto in px, con h=5px tarato per riprodurre il
+  CONTEGGIO nuclei del metodo storico sulle 40 patch (rapporto 0.84x).
+
+  v4.2 — Il benchmark indipendente su GPU (Cellpose v4.x Oracle GT, n=10 patch)
+  è stato rieseguito e ha SMENTITO la scelta: h_maxima(h=5) è risultato
+  peggiore del metodo storico su TUTTE le metriche e su TUTTE le 10 patch,
+  senza eccezioni (Dice 0.4973 vs 0.6373; AJI 0.2173 vs 0.3097; F1 0.2943 vs
+  0.4101). Il default è quindi tornato a `marker_method="relative_threshold"`.
+  Causa dell'errore di taratura: h=5 era stato scelto per far coincidere il
+  NUMERO di nuclei rilevati, un proxy di quantità che non garantisce che i
+  marker cadano nella posizione corretta — la qualità d'istanza (AJI/Dice)
+  contro una GT indipendente non era stata misurata.
+
+  `marker_method="h_maxima"` resta disponibile come opzione esplicita: la sua
+  maggiore robustezza ai blob patologici estremi è reale e riproducibile, ma
+  richiede una ri-taratura di `h_maxima_px` che massimizzi AJI/Dice contro la
+  GT Cellpose (non il conteggio nuclei) prima di poter essere riproposto come
+  default. Vedi reports/fase2_report.md, sezione 7, per dati e discussione.
 ===============================================================================
 """
 
@@ -30,6 +58,7 @@ import numpy as np
 import scipy.ndimage as ndi
 from pathlib import Path
 from skimage.feature import peak_local_max
+from skimage.morphology import h_maxima
 from skimage.segmentation import watershed
 from skimage.measure import regionprops, label
 
@@ -54,9 +83,11 @@ _IMAGENET_STD  = [0.229, 0.224, 0.225]
 def segment_nuclei_watershed(
     h_channel,
     min_distance: int = 12,
-    peak_threshold_rel: float = 0.15,
+    h_maxima_px: int = 5,
     min_area_px: int = 30,
-    max_area_px: int = 2500
+    max_area_px: int = 2500,
+    marker_method: str = "relative_threshold",
+    peak_threshold_rel: float = 0.15,
 ):
     """
     Esegue la segmentazione d'istanza dei nuclei cellulari sul canale H (Ematossilina)
@@ -67,23 +98,56 @@ def segment_nuclei_watershed(
       - Centroblasto FL:   diametro ~8–15 µm, area fino a ~130 µm² → max_area fino a 2500 px.
       Riferimento: Iwamoto et al. (2024), Computers in Biology and Medicine.
 
+    RILEVAMENTO MARKER — due metodi disponibili (vedi reports/fase2_report.md,
+    sezione 7, per l'analisi completa e i dati di benchmark):
+
+      "relative_threshold" (DEFAULT, v3.0/v4.0/v4.2): soglia globale
+        `distance.max() * peak_threshold_rel`. È il metodo validato contro la
+        Ground Truth indipendente Cellpose v4.x (Dice 0.6373, AJI 0.3097,
+        F1 0.4101 su n=10 patch) e il migliore dei due su questo dataset.
+
+      "h_maxima" (v4.1, NON default): trasformata h-maxima (Vincent, 1993)
+        applicata alla distance map. Il parametro h_maxima_px è una soglia di
+        prominenza LOCALE/assoluta (in px), indipendente dal massimo globale
+        della patch. Teoricamente più robusto all'eterogeneità dimensionale dei
+        nuclei (Veta et al., 2013, PLoS ONE, DOI: 10.1371/journal.pone.0070221;
+        Koyuncu et al., 2016, Cytometry Part A, DOI: 10.1002/cyto.a.22824), e
+        in effetti degrada gradualmente là dove relative_threshold collassa su
+        blob sintetici estremi. Tuttavia, con la taratura attuale (h=5px) è
+        risultato peggiore su TUTTE le metriche e TUTTE le 10 patch del
+        benchmark Cellpose (Dice 0.4973, AJI 0.2173, F1 0.2943). Usare solo
+        dopo ri-taratura di h_maxima_px contro AJI/Dice — vedi report §7.7.
+
     Args:
         h_channel (np.ndarray): Canale H in scala di grigi uint8.
         min_distance (int): Distanza minima in pixel tra centroidi locali (default 12 px ≈ 2.8 µm).
-                            Valori inferiori al raggio medio del nucleo causano over-segmentazione.
-        peak_threshold_rel (float): Soglia relativa al massimo della distance map per accettare
-                                    un picco come marker (default 0.15 = 15% del massimo locale).
-                                    Controlla direttamente la sensibilità del rilevamento.
+                            Usato solo con marker_method="relative_threshold".
+        h_maxima_px (int): Prominenza minima (in px) di un massimo locale della distance
+                           map per essere accettato come marker (default 5 px ≈ 1.15 µm).
+                           Usato solo con marker_method="h_maxima". ATTENZIONE: h=5 è una
+                           taratura SUPERATA — era stata scelta per far coincidere il
+                           conteggio nuclei col metodo storico (rapporto 0.84x su 40 patch),
+                           ma il benchmark Cellpose l'ha poi mostrata inferiore su tutte le
+                           metriche di qualità. Inoltre la curva è ripida: h>=6 causa un
+                           collasso brusco del conteggio (<0.15x). Ri-tarare contro AJI/Dice
+                           prima di usare questo metodo.
+        peak_threshold_rel (float): Soglia relativa al massimo della distance map (default
+                                    0.15). Usato solo con marker_method="relative_threshold".
         min_area_px (int): Area minima nucleare in pixel (default 30 px ≈ 1.6 µm²).
                            Rimuove rumori di binarizzazione e artefatti submicron.
         max_area_px (int): Area massima nucleare in pixel (default 2500 px ≈ 132 µm²).
                            Aumentato da 1500 a 2500 per includere centroblasti grandi
                            (Iwamoto et al. 2024: area mediana centroblasti ~55–70 µm², tail > 100 µm²).
+        marker_method (str): "relative_threshold" (default, validato su GT Cellpose)
+                             oppure "h_maxima" (sperimentale, richiede ri-taratura).
 
     Returns:
         cleaned_labels (np.ndarray): Maschera d'istanza int32 (0 = sfondo, ID ≥ 1 = nuclei).
         centroids (list[dict]): Centroidi con coordinate px e µm, area px e µm².
     """
+    if marker_method not in ("h_maxima", "relative_threshold"):
+        raise ValueError(f"marker_method deve essere 'h_maxima' o 'relative_threshold', ricevuto: {marker_method!r}")
+
     # 1. Sogliatura globale di Otsu per binarizzare il canale H
     #    (NOTA: Otsu è una soglia GLOBALE basata sulla varianza inter-classe dell'istogramma,
     #    non adattiva. È appropriata per il canale H post-normalizzazione Macenko che ha
@@ -94,29 +158,36 @@ def segment_nuclei_watershed(
     #    distanza dal bordo più vicino. I massimi locali corrispondono ai centri dei nuclei.
     distance = ndi.distance_transform_edt(binary)
 
-    # 3. Trova picchi locali della distance map (candidati centri nucleari).
-    #    - min_distance: sopprime picchi troppo vicini (evita over-segmentazione).
-    #    - peak_threshold_rel: accetta solo picchi > peak_threshold_rel * max(distance).
-    #      Questo parametro è ora correttamente usato dalla firma della funzione.
-    abs_threshold = distance.max() * peak_threshold_rel
-    coords = peak_local_max(
-        distance,
-        min_distance=min_distance,
-        threshold_abs=abs_threshold,
-        labels=binary
-    )
+    # 3. Trova i marker candidati (centri nucleari) sulla distance map.
+    if marker_method == "h_maxima":
+        # [SPERIMENTALE — non default] Criterio di prominenza LOCALE (Vincent, 1993):
+        # un massimo viene accettato solo se supera di almeno h_maxima_px i punti di sella
+        # che lo separano da massimi vicini di pari o maggiore altezza — indipendente dal
+        # massimo globale dell'immagine. Inferiore a relative_threshold con h=5px sul
+        # benchmark Cellpose: ri-tarare prima dell'uso (vedi docstring e report §7.7).
+        hmax_mask = h_maxima(distance, h_maxima_px)
+        markers = label(hmax_mask)
+    else:
+        # [DEFAULT] Soglia GLOBALE relativa al massimo della patch — metodo validato
+        # contro la GT indipendente Cellpose v4.x.
+        #    - min_distance: sopprime picchi troppo vicini (evita over-segmentazione).
+        #    - peak_threshold_rel: accetta solo picchi > peak_threshold_rel * max(distance).
+        abs_threshold = distance.max() * peak_threshold_rel
+        coords = peak_local_max(
+            distance,
+            min_distance=min_distance,
+            threshold_abs=abs_threshold,
+            labels=binary
+        )
+        mask_markers = np.zeros(distance.shape, dtype=bool)
+        if len(coords) > 0:
+            mask_markers[tuple(coords.T)] = True
+        markers, _ = ndi.label(mask_markers)
 
-    # 4. Maschera dei marker per il Watershed
-    mask_markers = np.zeros(distance.shape, dtype=bool)
-    if len(coords) > 0:
-        mask_markers[tuple(coords.T)] = True
-
-    markers, _ = ndi.label(mask_markers)
-
-    # 5. Watershed guidato dai marker sulla distance map negata
+    # 4. Watershed guidato dai marker sulla distance map negata
     labels_ws = watershed(-distance, markers, mask=binary)
 
-    # 6. Filtraggio morfologico: rimuove regioni troppo piccole (rumore) o troppo grandi
+    # 5. Filtraggio morfologico: rimuove regioni troppo piccole (rumore) o troppo grandi
     #    (artefatti di fusione tra nuclei non separati dal Watershed)
     cleaned_labels = np.zeros_like(labels_ws, dtype=np.int32)
     centroids = []

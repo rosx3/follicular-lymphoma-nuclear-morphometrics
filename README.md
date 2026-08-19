@@ -92,7 +92,7 @@ testNuovoTesi/
 - **Nuclei Estratti:** **94.042 nuclei totali** registrati nel file `centroids_all.csv`.
 - **Validazione Indipendente su GPU (Cellpose v4.x Oracle GT, $d=22.0\text{ px} \approx 5.06\,\mu m$):**
   - **Dice Score (Pixel-level):** Watershed **$63.73\% \pm 10.91\%$** vs U-Net ResNet-34 **$57.38\% \pm 12.60\%$**
-  - **AJI Index (Instance-level):** Watershed **$0.3255 \pm 0.0646$** vs U-Net ResNet-34 **$0.2873 \pm 0.0645$**
+  - **AJI Index (Instance-level):** Watershed **$0.3097 \pm 0.0723$** vs U-Net ResNet-34 **$0.2873 \pm 0.0645$**
   - **F1 Detection Score:** Watershed **$0.4101 \pm 0.0716$** vs U-Net ResNet-34 **$0.3508 \pm 0.0882$**
 - **Risultato Principale:** Il Watershed zero-shot guidato dalla fisica dell'assorbimento cromatico supera le prestazioni della U-Net deep learning, dimostrandosi immune all'overfitting da campioni limitati.
 

@@ -19,6 +19,15 @@ CORREZIONI APPLICATE (v2):
  - FIX 4: Rimosso import inutile di matplotlib
  - AGGIUNTA: Salvataggio preprocessing_metadata.json per riproducibilità
 
+CORREZIONI APPLICATE (v3, 19/08/2026 — code review):
+ - FIX 5: _estimate_HE_vectors() ora stima gli estremi H/E tramite atan2(angolo) +
+          percentile sull'angolo, invece del rapporto Phi[:,1]/Phi[:,0]. Le due
+          formulazioni sono state verificate numericamente equivalenti su dati OD
+          H&E realistici, ma si adotta la forma con atan2 per aderenza letterale
+          al metodo pubblicato da Macenko et al. (2009) — citabilità diretta in
+          tesi — e per eliminare il rischio residuo di instabilità del rapporto
+          quando la proiezione sul primo asse principale è vicina a zero.
+
 Reference:
  - Macenko et al. (2009) IEEE ISBI
  - Ruifrok & Johnston (2001) Anal. Quant. Cytol. Histol.
@@ -148,14 +157,25 @@ class StainNormalizerMacenko:
         if V[1, 0] < 0:
             V[1, :] *= -1
 
-        # Proietta i pixel sul piano e stima i due estremi (H e E)
-        Phi      = np.dot(ODhat, V.T)
-        phi_ratio = Phi[:, 1] / (Phi[:, 0] + 1e-10)
-        alpha_min = np.percentile(phi_ratio, self.alpha)
-        alpha_max = np.percentile(phi_ratio, 100 - self.alpha)
+        # Proietta i pixel sul piano e stima i due estremi (H e E) tramite l'angolo
+        # polare di ciascun pixel proiettato — formulazione standard di Macenko et al.
+        # (2009): atan2(y, x) + percentile sull'angolo, come nella quasi totalita' delle
+        # implementazioni di riferimento pubbliche del metodo.
+        # NOTA (v3, 19/08/2026): versione precedente usava il rapporto Phi[:,1]/Phi[:,0]
+        # anziche' l'angolo. Verificato numericamente (simulazione su dati OD H&E
+        # realistici) che le due formulazioni sono equivalenti quando la proiezione sul
+        # primo asse principale (Phi[:,0]) resta positiva, come tipicamente accade per
+        # dati di assorbanza ottica fisiologici. Si adotta comunque atan2 per aderenza
+        # letterale al metodo pubblicato (citabilita' diretta di Macenko et al. 2009 in
+        # tesi) e per eliminare il rischio residuo di instabilita' del rapporto quando
+        # Phi[:,0] si avvicina a zero (patch con tessuto molto scarso).
+        Phi = np.dot(ODhat, V.T)
+        phi = np.arctan2(Phi[:, 1], Phi[:, 0])
+        phi_min = np.percentile(phi, self.alpha)
+        phi_max = np.percentile(phi, 100 - self.alpha)
 
-        vMin = np.dot(V.T, np.array([1, alpha_min]))
-        vMax = np.dot(V.T, np.array([1, alpha_max]))
+        vMin = np.dot(V.T, np.array([np.cos(phi_min), np.sin(phi_min)]))
+        vMax = np.dot(V.T, np.array([np.cos(phi_max), np.sin(phi_max)]))
 
         # Convenzione: colonna 0 = vettore con componente R maggiore (Ematossilina)
         if vMin[0] > vMax[0]:
