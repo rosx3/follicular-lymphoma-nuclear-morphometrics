@@ -34,3 +34,5 @@ ENV/
 *.egg-info/
 dist/
 build/
+scratch/
+

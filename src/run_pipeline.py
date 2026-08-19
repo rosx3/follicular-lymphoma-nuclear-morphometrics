@@ -64,6 +64,16 @@ _spec_seg.loader.exec_module(_mod_seg)
 segment_nuclei_watershed  = _mod_seg.segment_nuclei_watershed
 draw_segmentation_overlay = _mod_seg.draw_segmentation_overlay
 
+# Modulo 03: Feature Extraction
+_spec_feat = importlib.util.spec_from_file_location("mod_feature_extraction", _SRC_DIR / "03_feature_extraction.py")
+_mod_feat = importlib.util.module_from_spec(_spec_feat)
+_spec_feat.loader.exec_module(_mod_feat)
+
+extract_nucleus_morphometry    = _mod_feat.extract_nucleus_morphometry
+aggregate_patch_morphometry    = _mod_feat.aggregate_patch_morphometry
+save_morphometry_visual_preview = _mod_feat.save_morphometry_visual_preview
+
+
 
 # ---------------------------------------------------------------------------
 # Costanti
@@ -72,6 +82,8 @@ BASE_DIR      = Path(__file__).resolve().parent.parent
 RAW_DIR       = BASE_DIR / "data" / "raw"
 FASE1_DIR     = BASE_DIR / "data" / "fase1_preprocessing"
 FASE2_DIR     = BASE_DIR / "data" / "fase2_segmentation"
+FASE3_DIR     = BASE_DIR / "data" / "fase3_features"
+IMG_FASE3_DIR = BASE_DIR / "img" / "fase3"
 
 CATEGORIES = {
     "follicular_lymphoma": "FL",
@@ -157,7 +169,6 @@ def run_fase1(verbose: bool = True) -> None:
     elapsed = time.time() - t0
     print(f"\n[Fase 1] Completata: {n_ok} immagini OK, {n_err} errori — "
           f"{elapsed:.1f}s ({elapsed/max(n_ok,1):.2f}s/img)")
-
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +276,123 @@ def run_fase2(verbose: bool = True) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Fase 3 — Estrazione Biomarcatori Citomorfometrici
+# ---------------------------------------------------------------------------
+def run_fase3(verbose: bool = True) -> None:
+    """
+    Esegue l'estrazione dei biomarcatori citomorfometrici d'istanza e aggregati.
+
+    Input:
+      data/fase2_segmentation/<categoria>/masks/   ← maschere 16-bit
+      data/fase1_preprocessing/<categoria>/rgb_normalized/ ← RGB per anteprime
+
+    Output:
+      data/fase3_features/features_nuclei_all.csv   ← ~94.042 righe (nuclei singoli)
+      data/fase3_features/features_patches_master.csv ← 600 righe (patch aggregate)
+      data/fase3_features/feature_extraction_metadata.json ← Metadati FAIR
+      img/fase3/morphometry_regions_preview.png     ← Anteprima Bounding Boxes
+    """
+    print("\n" + "=" * 70)
+    print("  FASE 3: Estrazione Biomarcatori Citomorfometrici (Forma & Dimensione)")
+    print("=" * 70)
+
+    FASE3_DIR.mkdir(parents=True, exist_ok=True)
+    IMG_FASE3_DIR.mkdir(parents=True, exist_ok=True)
+
+    all_nuclei_rows = []
+    all_patch_rows  = []
+    n_ok = 0
+    n_err = 0
+    t0 = time.time()
+
+    sample_fl_rgb, sample_fl_mask = None, None
+    sample_re_rgb, sample_re_mask = None, None
+
+    for cat_name, cat_label in CATEGORIES.items():
+        mask_dir = FASE2_DIR / cat_name / "masks"
+        rgb_dir  = FASE1_DIR / cat_name / "rgb_normalized"
+
+        if not mask_dir.exists():
+            print(f"  [SKIP] {mask_dir} non trovata — esegui prima la Fase 2.")
+            continue
+
+        mask_paths = sorted(mask_dir.glob("*.png"))
+
+        for mask_p in tqdm(mask_paths, desc=f"  Fase 3 — {cat_label}", unit="img"):
+            try:
+                mask_16 = cv2.imread(str(mask_p), cv2.IMREAD_UNCHANGED)
+                if mask_16 is None:
+                    raise ValueError(f"Impossibile leggere {mask_p.name}")
+
+                # 1. Estrazione d'istanza per singolo nucleo
+                nuclei_feat = extract_nucleus_morphometry(mask_16)
+
+                # Salva campioni per l'anteprima grafica
+                rgb_p = rgb_dir / mask_p.name.replace("_mask.png", ".png")
+                if cat_label == "FL" and sample_fl_rgb is None and rgb_p.exists():
+                    sample_fl_rgb, sample_fl_mask = str(rgb_p), str(mask_p)
+                elif cat_label == "REACTIVE" and sample_re_rgb is None and rgb_p.exists():
+                    sample_re_rgb, sample_re_mask = str(rgb_p), str(mask_p)
+
+                image_stem = mask_p.stem.replace("_mask", "")
+
+                for nf in nuclei_feat:
+                    nf["image_name"] = image_stem
+                    nf["category"]   = cat_label
+                    all_nuclei_rows.append(nf)
+
+                # 2. Aggregazione statistica per patch
+                patch_stat = aggregate_patch_morphometry(
+                    nuclei_feat, image_stem, cat_label
+                )
+                patch_stat["target"] = 1 if cat_label == "FL" else 0
+                all_patch_rows.append(patch_stat)
+
+                n_ok += 1
+
+            except Exception as e:
+                print(f"\n  [WARN] Errore su {mask_p.name}: {e}")
+                n_err += 1
+
+    # 3. Salva CSV Singoli Nuclei (~94.042 righe)
+    if all_nuclei_rows:
+        csv_nuclei = FASE3_DIR / "features_nuclei_all.csv"
+        # Riorganizza colonne con image_name e category all'inizio
+        first_cols = ["image_name", "category", "nucleus_id"]
+        other_cols = [c for c in all_nuclei_rows[0].keys() if c not in first_cols]
+        fieldnames = first_cols + other_cols
+
+        with open(csv_nuclei, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_nuclei_rows)
+        print(f"\n[Fase 3] CSV Nuclei Singoli: {len(all_nuclei_rows):,} nuclei → {csv_nuclei}")
+
+    # 4. Salva CSV Patch Master (600 righe)
+    if all_patch_rows:
+        csv_patches = FASE3_DIR / "features_patches_master.csv"
+        fieldnames = list(all_patch_rows[0].keys())
+        with open(csv_patches, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_patch_rows)
+        print(f"[Fase 3] CSV Patch Master: {len(all_patch_rows)} patch → {csv_patches}")
+
+    # 5. Generazione Anteprima Grafica con Bounding Boxes
+    if sample_fl_rgb and sample_re_rgb:
+        preview_png = IMG_FASE3_DIR / "morphometry_regions_preview.png"
+        save_morphometry_visual_preview(
+            sample_fl_rgb, sample_fl_mask,
+            sample_re_rgb, sample_re_mask,
+            str(preview_png)
+        )
+
+    elapsed = time.time() - t0
+    print(f"[Fase 3] Completata: {n_ok} patch OK, {n_err} errori — "
+          f"{elapsed:.1f}s ({elapsed/max(n_ok,1):.2f}s/img)")
+
+
+# ---------------------------------------------------------------------------
 # Entry Point
 # ---------------------------------------------------------------------------
 def main():
@@ -277,13 +405,13 @@ def main():
         nargs="+",
         type=int,
         choices=[1, 2, 3, 4],
-        default=[1, 2],
+        default=[1, 2, 3],
         metavar="N",
         help=(
-            "Fasi da eseguire (default: 1 2).\n"
+            "Fasi da eseguire (default: 1 2 3).\n"
             "  1 = Preprocessing (Macenko + CLAHE)\n"
             "  2 = Segmentazione (Watershed + Centroidi)\n"
-            "  3 = Estrazione Biomarcatori [TODO]\n"
+            "  3 = Estrazione Biomarcatori Citomorfometrici\n"
             "  4 = Classificazione + SHAP XAI [TODO]"
         ),
     )
@@ -305,8 +433,7 @@ def main():
         run_fase2(verbose=verbose)
 
     if 3 in fasi:
-        print("\n[INFO] Fase 3 (Estrazione Biomarcatori) — in sviluppo.")
-        # TODO: importare e invocare src/03_feature_extraction.py
+        run_fase3(verbose=verbose)
 
     if 4 in fasi:
         print("\n[INFO] Fase 4 (Classificazione + XAI) — in sviluppo.")
