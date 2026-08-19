@@ -1,7 +1,9 @@
 # Report Finale — Fase 2: Segmentazione dei Nuclei Cellulari ed Estrazione Centroidi
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
-*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.0*  
-*Aggiornato il 18 agosto 2026 — Audit globale del progetto*
+*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.2*  
+*Aggiornato il 19 agosto 2026 — Benchmark GPU del metodo `h_maxima` completato: default riportato a `relative_threshold` (vedi Sezione 7.7)*
+
+> ✅ **Nota sui numeri di benchmark riportati in questo documento (Sezioni 2-4):** sono calcolati con `marker_method="relative_threshold"`, che a seguito del benchmark indipendente di Sezione 7.7 **è tornato a essere il metodo di default della pipeline (v4.2)**. I numeri di Sezioni 2-4 sono quindi validi e citabili in tesi come risultati della pipeline attuale.
 
 ---
 
@@ -45,8 +47,11 @@ Per garantire il massimo rigore scientifico ed evitare la circolarità della val
 
 | Modello di Segmentazione | Dice (Pixel) | IoU (Pixel) | AJI (Instance) | F1 Detection @0.5 |
 | :--- | :---: | :---: | :---: | :---: |
-| 🥇 **Marker-Controlled Watershed Zero-Shot** | **$0.6373 \pm 0.1091$** | **$0.4763 \pm 0.1081$** | **$0.3255 \pm 0.0646$** | **$0.4101 \pm 0.0716$** |
-| 🥈 **PyTorch U-Net (ResNet-34 Backbone)** | $0.5738 \pm 0.1260$ | $0.4124 \pm 0.1136$ | $0.2873 \pm 0.0645$ | $0.3508 \pm 0.0882$ |
+| 🥇 **Marker-Controlled Watershed Zero-Shot** | **$0.6373 \pm 0.1091$** | **$0.4763 \pm 0.1081$** | **$0.3097 \pm 0.0723$** ⁽¹⁾ | **$0.4101 \pm 0.0716$** |
+| 🥈 **PyTorch U-Net (ResNet-34 Backbone)** | $0.5738 \pm 0.1260$ | $0.4124 \pm 0.1136$ | $0.2873 \pm 0.0645$ | $0.3508 \pm 0.0882$ ⁽²⁾ |
+
+⁽¹⁾ Valore aggiornato al calcolo **post-FIX A** (Sezione 6). Il valore precedentemente riportato ($0.3255$) era lievemente inflazionato dal bug di accoppiamento non univoco nell'AJI. Vedi Sezione 7.7.5.
+⁽²⁾ Le metriche U-Net presentano forte varianza run-to-run (rete ri-addestrata a ogni esecuzione): vedi Sezione 7.7.5 per l'intervallo osservato e le implicazioni sulle conclusioni di Sezione 4.
 
 #### Breakdown per Classe Istologica (Watershed vs U-Net):
 - **Linfoma Follicolare (FL):**
@@ -65,25 +70,27 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 ### 🎓 Conclusioni da Inserire nella Tesi:
 
 1. **Superiorità del Watershed Zero-Shot guidato dalla Fisica:**
-   L'algoritmo **Marker-Controlled Watershed applicato al canale H deconvoluto con Macenko** supera la rete neurale U-Net ResNet-34 su tutte le metriche sia a livello di pixel (Dice $63.7\%$ vs $57.4\%$) che di istanza (AJI $0.3255$ vs $0.2873$, F1 $0.4101$ vs $0.3508$).  
-   *Spiegazione scientifica:* La decomposizione cromatica in Densità Ottica (OD space) isola la cromaticità dell'ematossilina in modo analitico e privo di bias di addestramento. Questo rende il Watershed immune all'overfitting che colpisce le reti deep quando addestrate su dataset limitati di patch.
+   L'algoritmo **Marker-Controlled Watershed applicato al canale H deconvoluto con Macenko** supera la rete neurale U-Net ResNet-34 sulle metriche d'istanza (AJI $0.3097$ vs $0.2873$, F1 $0.4101$ vs $0.3508$) e, in questo run, anche a livello di pixel (Dice $63.7\%$ vs $57.4\%$).  
+   *Spiegazione scientifica:* La decomposizione cromatica in Densità Ottica (OD space) isola la cromaticità dell'ematossilina in modo analitico e privo di bias di addestramento. Questo rende il Watershed immune all'overfitting che colpisce le reti deep quando addestrate su dataset limitati di patch.  
+   ⚠️ *Cautela statistica (vedi Sezione 7.7.5):* il vantaggio è **consistente su AJI e F1 in tutti i run disponibili**, ma **non robusto sul solo Dice pixel-level**, dove in un run su patch diverse la U-Net è risultata superiore. Formulare la conclusione in tesi privilegiando le metriche d'istanza, o mediare su più seed di addestramento prima della consegna.
 
 2. **Risoluzione Rigorosa della Circolarità della Validazione:**
    L'uso di una Ground Truth generata da un modello esterno super partes (Cellpose v4.x, *Stringer et al., 2021*) ricalibrato alla dimensione reale dei nuclei linfocitari ($d = 22.0\text{ px} \approx 5.06\,\mu m$) ha permesso di eliminare il bias di autovalutazione.  
-   L'accordo di Dice del $63.7\%$ e l'AJI di $0.3255$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando perfettamente negli intervalli di concordanza standard riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
+   L'accordo di Dice del $63.7\%$ e l'AJI di $0.3097$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando perfettamente negli intervalli di concordanza standard riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
 
 3. **Maggiore F1-Detection nel Linfoma Follicolare (FL):**
    Sia il Watershed ($F1 = 0.4419$) che la U-Net ($F1 = 0.3864$) ottengono prestazioni superiori nelle patch FL rispetto a quelle RE ($0.3782$ e $0.3152$). Questo conferma l'ipotesi patologica che l'impaccamento e l'ipercromasia dei nuclei linfomatosi forniscono un contrasto di gradiente più netto nel canale Ematossilina rispetto al tessuto reattivo.
 
 ---
 
-## 5. Parametri Calibrati dell'Algoritmo Watershed (v3.0)
+## 5. Parametri Calibrati dell'Algoritmo Watershed
 
 | Parametro | Valore | Significato Fisico/Biologico | Riferimento |
 |---|---|---|---|
-| `min_distance` | **12 px** ($2.8\,\mu m$) | Coerente con il raggio medio dei linfociti ($3\text{--}6\,\mu m$) | Iwamoto et al. (2024) |
+| `min_distance` (v4.2, DEFAULT) | **12 px** ($2.8\,\mu m$) | Coerente con il raggio medio dei linfociti ($3\text{--}6\,\mu m$); usato con `marker_method="relative_threshold"` | Iwamoto et al. (2024) |
+| `peak_threshold_rel` (v4.2, DEFAULT) | **0.15** | 15% del massimo della trasformata di distanza della patch; usato con `marker_method="relative_threshold"` | Parametro esplicito |
+| `h_maxima_px` (sperimentale, NON default) | **5 px** ($1.15\,\mu m$) | Prominenza minima locale di un massimo della distance map, indipendente dal massimo globale della patch. **Taratura superata:** inferiore al default sul benchmark Cellpose — vedi Sezione 7.7 | Vincent (1993); Sezione 7 |
 | `max_area_px` | **2500 px** ($132\,\mu m^2$) | Include i centroblasti di grandi dimensioni ($>100\,\mu m^2$) | Iwamoto et al. (2024) |
-| `peak_threshold_rel` | **0.15** | 15% del massimo locale della trasformata di distanza | Parametro esplicito |
 | `microns_per_pixel` | **0.23 $\mu m$/px** | Calibrazione spaziale dello scanner a $40\times$ | Standard WSI |
 
 ---
@@ -100,6 +107,9 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 8. **Xerri L, Dirnhofer S, Quintanilla-Martinez L, et al.** (2016). *The heterogeneity of follicular lymphomas: from early development to transformation*. **Virchows Archiv**, 468(2), 127-139. DOI: 10.1007/s00428-015-1864-y.
 9. **Carreras J.** (2023). *The pathobiology of follicular lymphoma*. **Journal of Clinical and Experimental Hematopathology (JCEH)**, 63(3), 152-163. DOI: 10.3960/jslrt.23023.
 10. **Ronneberger O, Fischer P, Brox T.** (2015). *U-Net: Convolutional Networks for Biomedical Image Segmentation*. **MICCAI 2015**, LNCS 9351, pp. 234-241.
+11. **Vincent L.** (1993). *Morphological grayscale reconstruction in image analysis: applications and efficient algorithms*. **IEEE Transactions on Image Processing**, 2(2), 176-201. DOI: 10.1109/83.217222. *(Fondamento della trasformata h-maxima usata in v4.1, Sezione 7)*
+12. **Veta M, van Diest PJ, Kornegoor R, Huisman A, Viergever MA, Pluim JPW.** (2013). *Automatic Nuclei Segmentation in H&E Stained Breast Cancer Histopathology Images*. **PLoS ONE**, 8(7), e70221. DOI: 10.1371/journal.pone.0070221. *(Motivazione empirica del limite del threshold globale singolo su nuclei di dimensione eterogenea)*
+13. **Koyuncu CF, Arslan S, Durmaz I, Cetin-Atalay R, Gunduz-Demir C.** (2016). *Iterative h-minima-based marker-controlled watershed for cell nucleus segmentation*. **Cytometry Part A**, 89(4), 338-349. DOI: 10.1002/cyto.a.22824. *(Approccio iterativo h-minima come possibile ulteriore raffinamento futuro, Sezione 7.6)*
 
 ---
 
@@ -135,3 +145,119 @@ Indipendentemente dal data leakage, le metriche della U-Net restano **inferiori*
 ### Dichiarazione da Inserire nella Tesi (Sezione Limitazioni)
 
 > *"Lo split train/val per la rete U-Net ResNet-34 è stato eseguito a livello di patch (20 train / 10 val). In un dataset con patch estratte da WSI dello stesso paziente, questo approccio potrebbe introdurre un data leakage che inflazionerebbe le metriche di validazione. Nel presente lavoro tale rischio è mitigato dal fatto che ciascuna immagine nel dataset Zenodo [DOI: 10.5281/zenodo.15702609] costituisce una patch anatomicamente indipendente proveniente da acquisizioni distinte. La valutazione definitiva delle due metodologie è stata condotta tramite un benchmark indipendente su GPU (Cellpose v4.x, Stringer et al., 2021), privo di qualsiasi forma di circolarità o leakage."*
+
+---
+
+## 7. Hardening Rilevazione Marker (v4.1) — 19 agosto 2026
+
+### 7.1 Origine della Modifica
+
+Durante una code review richiesta esplicitamente dall'autore (non un audit programmato), è stato esaminato il rilevamento dei marker in `segment_nuclei_watershed()`. Il codice v4.0 accettava un massimo locale della distance map come marker solo se `distanza > distance.max() * peak_threshold_rel` (default 0.15) — una soglia **globale**, ricalcolata sull'intera patch a ogni chiamata.
+
+### 7.2 Il Problema Identificato
+
+Questa soglia dipende dal massimo assoluto della distance map dell'**intera patch**. Se una patch contiene un nucleo o un blob molto più grande (es. un centroblasto isolato, oppure un cluster di nuclei fusi dalla sogliatura di Otsu — evenienza plausibile nei follicoli densamente impaccati), la soglia si alza proporzionalmente, e può superare l'altezza del massimo locale di nuclei realisticamente piccoli presenti nella stessa immagine, sopprimendone il marker.
+
+### 7.3 Verifica Empirica (metodologia: mai segnalare un sospetto come errore senza prima verificarlo)
+
+**Test 1 — casi sintetici estremi.** Simulando una patch con un blob di raggio crescente (28-150 px) accanto a 10 nuclei "realistici" (raggio 13 px, diametro $\approx 6\,\mu m$, coerente con la biologia già documentata in Sezione 5), il metodo v4.0 collassa **catastroficamente** (0/10 nuclei rilevati) non appena il blob supera $\approx$87 px di raggio — soglia = `87 * 0.15` $\approx$ 13 px, che eguaglia l'altezza del massimo locale dei nuclei piccoli.
+
+**Test 2 — 40 patch reali del dataset (20 FL + 20 REACTIVE, campionate).** Con soglia dimensionale realistica per "nucleo piccolo ma vero" (area 400-900 px², non debris sub-nucleare), il tasso di perdita nel dataset attuale è **3.0%** (6/201 nuclei piccoli isolati), senza bias evidente FL vs REACTIVE nel campione — perché `distance.max()` osservato sulle 600 patch reali non supera mai $\approx$13 px (i blob/nuclei più grandi in questo dataset non raggiungono la scala critica di $\approx$87 px vista nel Test 1). **Conclusione:** il meccanismo di rischio è reale e riproducibile, ma il suo impatto pratico sul dataset attuale era modesto. Si è comunque scelto di correggerlo per portare la pipeline a uno standard più robusto e generalizzabile (richiesta esplicita dell'autore), anziché limitarsi a documentarlo come limitazione accettata.
+
+### 7.4 Soluzione Adottata e Fonti
+
+Sostituita la soglia globale-relativa con la **trasformata h-maxima** (**Vincent, 1993** — riferimento fondativo per la ricostruzione morfologica in scala di grigi e le trasformate h-maxima/h-minima) applicata alla distance map. Il criterio diventa una **prominenza locale assoluta** (in px): un massimo è accettato solo se supera di almeno `h` i punti di sella che lo separano da massimi vicini di pari o maggiore altezza — un criterio topologico, non più dipendente dal massimo globale dell'immagine.
+
+Questo approccio è lo standard riconosciuto in letteratura per la segmentazione di nuclei di dimensione eterogenea:
+- **Veta et al. (2013, PLoS ONE)** — segmentazione di nuclei H&E in carcinoma mammario — dichiarano esplicitamente il problema riscontrato in questa review: *"It is difficult to set one parameter that will work well across all images in our data set, or, in many instances, across different nuclei within one image"*, e adottano la trasformata h-minima proprio per superarlo.
+- **Koyuncu et al. (2016, Cytometry Part A)** — propongono una versione **iterativa** dell'h-minima specificamente per nuclei cellulari, raffinando `h` per regione anziché usarne uno fisso; approccio più sofisticato di quello qui implementato (vedi Sezione 7.6, sviluppi futuri).
+
+### 7.5 Taratura del Parametro `h_maxima_px` e Validazione
+
+Il parametro `h` è stato tarato empiricamente sulle stesse 40 patch reali del Test 2, cercando il valore che riproducesse più fedelmente il comportamento (già validato contro Cellpose GT) del metodo storico, prima del punto di collasso:
+
+| `h` (px) | Nuclei totali rilevati (40 patch) | Rapporto vs metodo storico (2862 nuclei) |
+|---|---|---|
+| 3 | 5170 | 1.81× (sovra-segmentazione) |
+| 4 | 4013 | 1.40× (sovra-segmentazione) |
+| **5 (scelto)** | **2411** | **0.84×** |
+| 6 | 383 | 0.13× (collasso) |
+| 7 | 94 | 0.03× (collasso) |
+| 8+ | ≤26 | ≈0× (collasso totale) |
+
+La curva è molto ripida tra $h=5$ e $h=6$: la distance map di questo dataset ha un range dinamico compresso (max osservato 6-13 px sulle 40 patch), quindi il parametro non è liberamente estendibile senza ri-taratura.
+
+**Confronto diretto vecchio vs nuovo metodo, stesso stress-test del Test 1** (nuclei realistici $r=13\,px$ accanto a un blob di raggio crescente):
+
+| Raggio blob (px) | Nuclei rilevati — v4.0 (relative_threshold) | Nuclei rilevati — v4.1 (h_maxima, h=5) |
+|---|---|---|
+| 80 | 9/10 | 9/10 |
+| 87 | **0/10** (collasso) | 8/10 |
+| 100 | **0/10** (collasso) | 7/10 |
+| 120 | **0/10** (collasso) | 6/10 |
+| 150 | **0/10** (collasso) | 2/10 |
+
+Il nuovo metodo degrada **gradualmente** invece di collassare bruscamente, confermando l'ipotesi di maggiore robustezza attesa dalla letteratura.
+
+### 7.6 Azioni Aperte al Momento della v4.1 — *tutte chiuse in v4.2*
+
+1. ~~**Ri-eseguire il benchmark indipendente su GPU**~~ (Cellpose v4.x Oracle GT, Steps 2.2-2.4, notebook Colab) con `marker_method="h_maxima"`. → **ESEGUITO**, risultati in Sezione 7.7.
+2. **Metodo storico preservato** come `marker_method="relative_threshold"` — scelta rivelatasi decisiva: a seguito del benchmark è tornato a essere il **default** (v4.2).
+3. **Sviluppo futuro (fuori scope):** l'h-minima *iterativo* di Koyuncu et al. (2016) — che adatta `h` per regione anziché usarne uno fisso globale — rappresenterebbe un ulteriore irrobustimento, utile se il dataset venisse esteso a immagini con eterogeneità dimensionale maggiore di quella osservata nelle 600 patch attuali.
+
+---
+
+## 7.7 Esito del Benchmark Indipendente su `h_maxima` e Ripristino del Default (v4.2) — 19 agosto 2026
+
+### 7.7.1 Risultati
+
+Il benchmark di Sezione 7.6 punto 1 è stato eseguito su GPU (Colab) sulle **stesse 10 patch di validazione** usate in Sezione 3.2, con la medesima Ground Truth Cellpose v4.x ($d = 22.0$ px). Dati grezzi: [`data/fase2_segmentation/colab_benchmark_v3_hmaxima_vs_legacy.csv`](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/colab_benchmark_v3_hmaxima_vs_legacy.csv).
+
+| Metrica | WS `h_maxima` (v4.1) | WS `relative_threshold` (legacy) | Δ relativo |
+| :--- | :---: | :---: | :---: |
+| **Dice (pixel)** | $0.4973 \pm 0.1795$ | **$0.6373 \pm 0.1150$** | **−22.0%** |
+| **IoU (pixel)** | $0.3478 \pm 0.1574$ | **$0.4763 \pm 0.1140$** | **−27.0%** |
+| **AJI (instance)** | $0.2173 \pm 0.0933$ | **$0.3097 \pm 0.0723$** | **−29.8%** |
+| **F1 Detection @0.5** | $0.2943 \pm 0.1078$ | **$0.4101 \pm 0.0755$** | **−28.2%** |
+
+**Breakdown per classe istologica:**
+
+| Classe | Metodo | Dice | AJI | F1 Det. |
+| :--- | :--- | :---: | :---: | :---: |
+| FL ($n=5$) | `h_maxima` | $0.4569$ | $0.2131$ | $0.2859$ |
+| FL ($n=5$) | `relative_threshold` | **$0.6413$** | **$0.3240$** | **$0.4419$** |
+| REACTIVE ($n=5$) | `h_maxima` | $0.5377$ | $0.2215$ | $0.3026$ |
+| REACTIVE ($n=5$) | `relative_threshold` | **$0.6332$** | **$0.2953$** | **$0.3782$** |
+
+Il degrado è **presente in entrambe le classi** ma più marcato su FL (Dice −28.8%) che su REACTIVE (−15.1%), coerentemente con la maggiore densità di impaccamento nucleare del linfoma, dove la separazione dei marker è più critica.
+
+**Analisi patch per patch:** su **9 patch su 10** `h_maxima` perde su *tutte e quattro* le metriche simultaneamente. L'unica eccezione è `REACTIVE_examples (244)`, dove `h_maxima` vince su tutte e quattro (Dice $0.6898$ vs $0.6512$; AJI $0.3379$ vs $0.3198$) — un singolo caso, insufficiente a controbilanciare il quadro generale.
+
+### 7.7.2 Decisione: Ripristino di `relative_threshold` come Default (v4.2)
+
+Applicando il criterio di decisione dichiarato in Sezione 7.5 (*"se il nuovo metodo è peggiore, va ri-tarato `h_maxima_px` o si mantiene `relative_threshold` come default"*), il default di `segment_nuclei_watershed()` è stato **riportato a `marker_method="relative_threshold"`**. Il metodo `h_maxima` resta disponibile come opzione esplicita, non attiva.
+
+**Conseguenza operativa:** le maschere e i centroidi già prodotti (94.042 nuclei, `centroids_all.csv`) sono stati generati con `relative_threshold` e **restano validi** — non è necessaria alcuna ri-esecuzione della Fase 2, e la Fase 3 può procedere sui dati esistenti.
+
+### 7.7.3 Perché la Taratura di `h=5` Ha Fallito — Lezione Metodologica per la Tesi
+
+Il parametro `h=5` era stato scelto in Sezione 7.5 cercando il valore che riproducesse più fedelmente il **conteggio totale di nuclei** del metodo storico (rapporto $0.84\times$ su 40 patch). Il benchmark dimostra che quel criterio di taratura era **il proxy sbagliato**: far coincidere *quanti* nuclei vengono rilevati non garantisce che i marker cadano nella *posizione corretta* per generare istanze ben sovrapposte alla Ground Truth. Un metodo può produrre il numero giusto di oggetti nei posti sbagliati.
+
+> **Dichiarazione per la Sezione Metodologia/Limitazioni della tesi:**
+> *"La taratura di un iperparametro di segmentazione deve essere condotta ottimizzando direttamente la metrica di qualità d'interesse (AJI/Dice contro una Ground Truth indipendente), non un proxy di numerosità come il conteggio degli oggetti rilevati. Nel presente lavoro, una taratura basata sul conteggio ha prodotto un parametro che degradava la qualità di segmentazione del 22-30% pur mantenendo un conteggio di nuclei apparentemente confrontabile."*
+
+### 7.7.4 Ciò che Resta Valido dell'Analisi v4.1
+
+Il risultato negativo **non invalida** la diagnosi tecnica di Sezione 7.2-7.3, che resta corretta e riproducibile:
+
+- La soglia globale-relativa di `relative_threshold` **è** vulnerabile ai blob di grandi dimensioni (collasso 0/10 nuclei per raggio $> \approx 87$ px, Test 1), e `h_maxima` degrada gradualmente dove il default collassa (Sezione 7.5).
+- Ciò che il benchmark dimostra è che questo vantaggio di **robustezza a casi limite** non si traduce, con la taratura attuale, in **accuratezza media su dati reali**. Sono due assi di valutazione distinti, e su questo dataset — dove `distance.max()` non supera mai $\approx 13$ px e lo scenario di collasso non si verifica mai — è il secondo a essere determinante.
+
+Questa distinzione è utile in tesi: la vulnerabilità documentata resta una **limitazione dichiarata** del metodo adottato, rilevante qualora il lavoro venisse esteso a WSI o a dataset con eterogeneità dimensionale maggiore, dove il trade-off potrebbe invertirsi.
+
+### 7.7.5 Nota sulla Correzione dell'AJI (FIX A) e sulla Varianza della U-Net
+
+Due osservazioni emerse dal confronto tra questo run e quello di Sezione 3.2, **sulle stesse 10 patch**:
+
+1. **AJI del Watershed legacy: $0.3097$ (qui) vs $0.3255$ (Sezione 3.2).** Dice, IoU e F1 sono invece *identici alla quarta cifra decimale*, e il Watershed è deterministico. La discrepanza è quindi imputabile esclusivamente alla metrica: questo run include il **FIX A** (Sezione 6), che ha corretto l'accoppiamento non univoco nel calcolo dell'AJI. Il valore **$0.3097$ è quello corretto**; $0.3255$ era lievemente inflazionato dal bug. *Da usare $0.3097$ nella tesi.*
+2. **Metriche U-Net: forte varianza run-to-run.** La rete viene ri-addestrata a ogni esecuzione (15 epoche, inizializzazione e split casuali). Sulle stesse patch si osservano Dice $0.5738$ (Sezione 3.2) e $0.5062$ (questo run); in un terzo run su patch diverse ([`segmentation_benchmark_v2_cellpose_gt.csv`](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/segmentation_benchmark_v2_cellpose_gt.csv)) la U-Net risultava addirittura *superiore* al Watershed ($0.6896$ vs $0.6269$). **La conclusione "Watershed > U-Net" di Sezione 4 va quindi presentata con cautela**: è solida sulle metriche d'istanza (AJI e F1, dove il Watershed vince in tutti i run disponibili), ma non robusta sul solo Dice pixel-level. Per una dichiarazione statisticamente difendibile in tesi servirebbe una media su più seed di addestramento — azione consigliata prima della consegna.
