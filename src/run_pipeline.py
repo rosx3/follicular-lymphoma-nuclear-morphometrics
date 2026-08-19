@@ -141,9 +141,16 @@ def run_fase1(verbose: bool = True) -> None:
     if verbose:
         print(f"[Fase 1] Reference Image: {ref_path}")
 
-    # Inizializza il normalizzatore di Macenko
+    # Inizializza il normalizzatore di Macenko.
+    # find_best_reference_image restituisce un path, mentre fit() — come
+    # transform() e process_single_image() — lavora su array RGB: la reference
+    # va caricata e convertita da BGR prima del fit.
+    ref_bgr = cv2.imread(str(ref_path))
+    if ref_bgr is None:
+        raise ValueError(f"Impossibile caricare la Reference Image: {ref_path}")
+
     normalizer = StainNormalizerMacenko()
-    normalizer.fit(ref_path)
+    normalizer.fit(cv2.cvtColor(ref_bgr, cv2.COLOR_BGR2RGB))
 
     # Contatori
     n_ok = 0
