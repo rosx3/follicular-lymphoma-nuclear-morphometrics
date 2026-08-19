@@ -3,6 +3,10 @@
 *Modulo: src/03_feature_extraction.py*
 *Aggiornato: 19 agosto 2026 — Corretta discrepanza nel conteggio delle feature (vedi nota in Sezione 2)*
 
+> **Piano operativo:** `reports/fase3_implementation_plan.md` — stato di avanzamento,
+> decisioni metodologiche approvate (D1–D7) e task di implementazione.
+> Questo report descrive *cosa* si misura e *perché*; il piano descrive *come* e *a che punto siamo*.
+
 ---
 
 ## Obiettivo
