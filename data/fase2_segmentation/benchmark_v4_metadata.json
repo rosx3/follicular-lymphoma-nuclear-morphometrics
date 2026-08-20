@@ -1,0 +1,83 @@
+{
+  "version": "v4",
+  "step": "Fase 2 — Benchmark GT Cellpose indipendente + U-Net ResNet-34",
+  "generated_by": "scratch/run_colab_benchmark.py",
+  "device": "cuda",
+  "versions": {
+    "cellpose_version": "sconosciuta",
+    "torch": "2.11.0+cu128",
+    "opencv": "4.14.0",
+    "numpy": "2.5.2"
+  },
+  "cellpose_gt": {
+    "model_type": "nuclei",
+    "diameter_px": 22.0,
+    "channels": [
+      0,
+      0
+    ],
+    "flow_threshold": 0.4,
+    "cellprob_threshold": 0.0,
+    "masks_dir": "cellpose_gt_masks",
+    "n_masks_saved": 10
+  },
+  "watershed_params": {
+    "min_distance": 7,
+    "min_area_px": 15,
+    "max_area_px": 2500,
+    "marker_method": "relative_threshold",
+    "peak_threshold_rel": 0.15
+  },
+  "split": {
+    "seed": 42,
+    "n_train": 20,
+    "n_val": 10,
+    "val_patches": [
+      "FL_examples (189)",
+      "FL_examples (20)",
+      "FL_examples (217)",
+      "FL_examples (15)",
+      "FL_examples (108)",
+      "REACTIVE_examples (103)",
+      "REACTIVE_examples (85)",
+      "REACTIVE_examples (244)",
+      "REACTIVE_examples (215)",
+      "REACTIVE_examples (233)"
+    ],
+    "train_patches": [
+      "FL_examples (253)",
+      "FL_examples (79)",
+      "FL_examples (249)",
+      "FL_examples (172)",
+      "FL_examples (110)",
+      "FL_examples (16)",
+      "FL_examples (299)",
+      "FL_examples (11)",
+      "FL_examples (32)",
+      "FL_examples (208)",
+      "REACTIVE_examples (16)",
+      "REACTIVE_examples (18)",
+      "REACTIVE_examples (22)",
+      "REACTIVE_examples (285)",
+      "REACTIVE_examples (11)",
+      "REACTIVE_examples (54)",
+      "REACTIVE_examples (232)",
+      "REACTIVE_examples (48)",
+      "REACTIVE_examples (86)",
+      "REACTIVE_examples (262)"
+    ]
+  },
+  "results_mean": {
+    "watershed": {
+      "dice": 0.7949999999999999,
+      "aji": 0.54114,
+      "f1_det": 0.71083
+    },
+    "unet": {
+      "dice": 0.8037500000000002,
+      "aji": 0.5370199999999999,
+      "f1_det": 0.71641
+    }
+  },
+  "nota": "La U-Net e' addestrata sulle maschere watershed prodotte con watershed_params: cambiando quei parametri cambia il suo target, quindi il confronto vale solo fra run che li condividono."
+}

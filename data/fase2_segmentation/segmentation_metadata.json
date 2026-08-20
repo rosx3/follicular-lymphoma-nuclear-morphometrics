@@ -1,5 +1,5 @@
 {
-  "version": "3.0",
+  "version": "4.3",
   "fase": "Fase 2 — Segmentazione Nuclei ed Estrazione Centroidi (Benchmark Indipendente)",
   "total_dataset_images": 600,
   "total_nuclei_segmented": 94042,
@@ -25,11 +25,12 @@
     },
     "pytorch_unet_resnet34": {
       "dice_coefficient_mean": 0.5738,
-      "dice_coefficient_std": 0.1260,
+      "dice_coefficient_std": 0.126,
       "iou_jaccard_mean": 0.4124,
       "aji_instance_mean": 0.2873,
       "f1_detection_mean": 0.3508
-    }
+    },
+    "SUPERSEDED_NOTE": "I valori sotto 'watershed_zero_shot' e 'pytorch_unet_resnet34' provengono dal run di agosto 2026 eseguito con min_distance=12, min_area_px=30 — parametri diversi da quelli del dataset. Superati dal run v4 del 20/08/2026: vedi benchmark_v4_metadata.json e reports/fase2_report.md sezione 7.8. Conservati come storia."
   },
   "output_files": {
     "masks": "data/fase2_segmentation/*/masks/",
@@ -37,5 +38,35 @@
     "centroids_csv": "data/fase2_segmentation/centroids_all.csv",
     "colab_benchmark_csv": "data/fase2_segmentation/colab_benchmark_results.csv",
     "model_weights": "data/fase2_segmentation/unet_resnet34_weights.pth"
+  },
+  "validation_benchmark_v4_current": {
+    "run_date": "2026-08-20",
+    "results_csv": "data/fase2_segmentation/segmentation_benchmark_v4_cellpose_gt.csv",
+    "metadata": "data/fase2_segmentation/benchmark_v4_metadata.json",
+    "gt_masks": "data/ground_truth/cellpose_v4/",
+    "watershed_params": {
+      "min_distance": 7,
+      "min_area_px": 15,
+      "max_area_px": 2500
+    },
+    "n_val_patches": 10,
+    "watershed_zero_shot": {
+      "dice_mean": 0.795,
+      "iou_mean": 0.662,
+      "aji_instance_mean": 0.5411,
+      "f1_detection_mean": 0.7108
+    },
+    "pytorch_unet_resnet34": {
+      "dice_mean": 0.8038,
+      "iou_mean": 0.674,
+      "aji_instance_mean": 0.537,
+      "f1_detection_mean": 0.7164
+    },
+    "wilcoxon_paired_p": {
+      "dice": 0.193,
+      "aji": 0.652,
+      "f1_detection": 0.922
+    },
+    "conclusione": "Differenze non statisticamente distinguibili: parita a costo di addestramento nullo."
   }
 }
