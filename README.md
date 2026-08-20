@@ -80,12 +80,14 @@ testNuovoTesi/
 │   ├── naming.py                          # Convenzioni di naming, categorie e risoluzione percorsi
 │   ├── calibration.py                     # ⭐ Calibrazione spaziale — unica fonte di verità
 │   ├── 01_preprocessing.py                # Pipeline Macenko + Deconvoluzione H-channel
-│   ├── 02_segmentation.py                 # Marker-Controlled Watershed v3.0 + U-Net PyTorch
+│   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   ├── feature_analysis.py                # Test di separabilità FL vs REACTIVE e figure
-│   └── 04_classification.py               # Machine Learning Tabulare & XAI (SHAP)
+│   ├── 04_classification.py               # Machine Learning Tabulare & XAI (SHAP) — da implementare
+│   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
+│   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
 │
-├── tests/                                 # Test automatici (pytest) — 117 test
+├── tests/                                 # Test automatici (pytest) — 151 test
 │   ├── test_calibration.py                # Calibrazione e assenza di duplicazioni
 │   ├── test_naming.py                     # Convenzioni di naming e categorie
 │   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
@@ -95,7 +97,10 @@ testNuovoTesi/
 │   ├── test_patch_feature_contract.py     # Contratto delle 50 colonne
 │   ├── test_feature_analysis.py           # Test statistici e correzione FDR
 │   ├── test_feature_figures.py            # Figure per la tesi
-│   └── test_segmentation_split.py         # Split stratificato train/val
+│   ├── test_segmentation_split.py         # Split stratificato train/val
+│   ├── test_gui_core.py                   # Coerenza GUI ↔ pipeline sui biomarcatori
+│   ├── test_gui.py                        # Interfaccia Streamlit headless (AppTest)
+│   └── test_segmentation_reproducibility.py  # I default rigenerano le maschere del dataset
 │
 ├── Biblioteca personale.txt               # Riferimenti bibliografici accademici
 ├── requirements.txt                       # Dipendenze Python con versioni pinned
@@ -111,13 +116,23 @@ testNuovoTesi/
 - **Isolamento del canale H (Ematossilina):** Estrazione del segnale nucleare purificato, trattato con Filtro Bilaterale (riduzione del rumore preservando i bordi) e **CLAHE** per l'esaltazione del contrasto locale.
 
 ### Fase 2: Segmentazione d'Istanza dei Nuclei Cellulari
-- **Algoritmo Operativo:** Marker-Controlled Distance-Transform Watershed ($12\text{ px} \approx 5.5\,\mu m$ min distance, max area $2500\text{ px} \approx 529\,\mu m^2$).
+- **Algoritmo Operativo:** Marker-Controlled Distance-Transform Watershed ($7\text{ px} \approx 3.2\,\mu m$ min distance, area nucleare ammessa $15$–$2500\text{ px}$).
+- **Riproducibilità dei parametri (agosto 2026):** le 600 maschere furono generate da un runner esterno al repository, prima che `run_pipeline.py` esistesse, e i suoi parametri non erano registrati da nessuna parte. I default rimasti nel modulo non erano quelli usati, e rieseguire la Fase 2 produceva il **54% di nuclei in meno**. I valori originali sono stati ricostruiti per ricerca su griglia e verificati su 60 patch estratte a caso: **60/60 identiche pixel per pixel** alle maschere del dataset. `tests/test_segmentation_reproducibility.py` impedisce che si perdano di nuovo.
 - **Nuclei Estratti:** **94.042 nuclei totali** registrati nel file `centroids_all.csv`.
 - **Validazione Indipendente su GPU (Cellpose v4.x Oracle GT, $d=22.0\text{ px} \approx 10.1\,\mu m$):**
   - **Dice Score (Pixel-level):** Watershed **$63.73\% \pm 10.91\%$** vs U-Net ResNet-34 **$57.38\% \pm 12.60\%$**
   - **AJI Index (Instance-level):** Watershed **$0.3097 \pm 0.0723$** vs U-Net ResNet-34 **$0.2873 \pm 0.0645$**
   - **F1 Detection Score:** Watershed **$0.4101 \pm 0.0716$** vs U-Net ResNet-34 **$0.3508 \pm 0.0882$**
-- **Risultato Principale:** Il Watershed zero-shot guidato dalla fisica dell'assorbimento cromatico supera le prestazioni della U-Net deep learning, dimostrandosi immune all'overfitting da campioni limitati.
+
+> ⚠️ **Questi numeri sono in revisione: non citarli finché il benchmark non è rieseguito.** Due problemi accertati.
+>
+> **1. Il benchmark misurava la configurazione sbagliata.** Lo script Colab invocava la segmentazione senza parametri, ereditando i default del modulo (`min_distance=12, min_area_px=30`) invece di quelli che hanno prodotto il dataset. Verificato sui conteggi `ws_n_pred` registrati: **10 patch su 10**. Il watershed fu quindi valutato in una configurazione che trova **63.7 nuclei per patch** contro i **149.2** della GT Cellpose, mentre quella reale del dataset ne trova **141.8** — a 5% da Cellpose. Recall e F1 di detection erano limitati alla radice.
+>
+> **2. I run registrati si contraddicono sul Dice.** `colab_benchmark_results.csv` dà Watershed Dice 0.6373 > U-Net 0.5738; `segmentation_benchmark_v2_cellpose_gt.csv` dà **U-Net 0.6896 > Watershed 0.6269**. I due val set condividono solo 4 patch su 10, e la U-Net viene riaddestrata a ogni run. Il fatto è già analizzato in [`reports/fase2_report.md`](reports/fase2_report.md) §7.7.5, che raccomanda una media su più seed prima di sostenere la conclusione: era quel README a non riportarne la cautela.
+>
+> La Ground Truth Cellpose non è nel repository — il run originale la teneva in memoria e non la salvava — quindi le metriche non sono ricalcolabili senza rigenerarla. Il benchmark va rifatto per intero: la U-Net è addestrata sulle maschere watershed, quindi correggere i parametri le cambia il target. Procedura in [`reports/fase2_report.md`](reports/fase2_report.md) §7.8.
+
+- **Risultato Principale (in revisione):** l'ipotesi di lavoro è che il Watershed zero-shot guidato dalla fisica dell'assorbimento cromatico regga il confronto con la U-Net, immune all'overfitting da campioni limitati. La verifica sperimentale è però quella descritta nell'avviso qui sopra, e va rifatta prima che l'affermazione possa essere sostenuta.
 
 ### Fase 3: Estrazione dei Biomarcatori e Separabilità Statistica
 - **Matrice prodotta:** **600 patch × 50 colonne** (47 biomarcatori + 3 metadati), da 94.042 nuclei. Zero errori, zero valori mancanti.
@@ -158,6 +173,30 @@ python src/02_segmentation.py             # [TEST] self-test modulo Segmentazion
 # Suite di test automatici
 python -m pytest tests/ -q
 ```
+
+### Interfaccia grafica
+
+```bash
+streamlit run src/gui.py
+```
+
+L'interfaccia richiede che le Fasi 1–3 siano già state eseguite (legge i loro
+output da `data/`) e offre tre sezioni:
+
+| Sezione | Cosa mostra |
+|---|---|
+| **Esplora dataset** | I cinque stadi della pipeline su una patch a scelta e i 47 biomarcatori, ciascuno posizionato nella distribuzione della propria classe |
+| **Analizza immagine** | Un'immagine nuova percorre Fase 1 → 2 → 3 dal vivo e viene confrontata con entrambe le classi |
+| **Risultati Fase 3** | Test di separabilità con correzione FDR e le figure prodotte da `feature_analysis.py` |
+
+> **Nessuna diagnosi.** L'interfaccia misura biomarcatori e li posiziona nelle
+> distribuzioni note; non emette una predizione FL vs REACTIVE, perché il
+> classificatore è la Fase 4, non ancora implementata.
+
+La logica sta in `src/gui_core.py`, separata dai widget: chiama le stesse
+funzioni di `run_pipeline.py` invece di reimplementarle, e un test di coerenza
+verifica che elaborando dalla GUI una patch del dataset si riottengano i valori
+scritti in `features_patches_master.csv`.
 
 ### Convenzioni dei nomi di file
 

@@ -2,7 +2,7 @@
 ===============================================================================
 Modulo 02: Segmentazione dei Nuclei Cellulari & Estrazione Centroidi
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Reattivo
-Versione: 4.2 — Esito benchmark h_maxima: default riportato a relative_threshold
+Versione: 4.3 — Default di segmentazione riallineati al dataset della tesi
               (agosto 2026)
 ===============================================================================
 Questo modulo gestisce:
@@ -23,6 +23,26 @@ NOTA METODOLOGICA (limitazione riconosciuta):
   Una validazione rigorosa richiederebbe annotazioni manuali su almeno un subset
   (es. MoNuSeg benchmark) o un split train/val fisicamente separato dalla GT.
   Questo limite va dichiarato esplicitamente nella sezione "Limitazioni" della tesi.
+
+RIPRODUCIBILITÀ DEI DEFAULT (v4.3, 20/08/2026):
+  Le 600 maschere in data/fase2_segmentation/ furono generate al commit 9c59248,
+  quando run_pipeline.py non esisteva ancora: la Fase 2 girò da un runner esterno
+  al repository (Colab) e i suoi parametri non furono registrati da nessuna parte
+  — segmentation_metadata.json salva i risultati, non i parametri dei marker.
+  I default rimasti nel modulo (min_distance=12, min_area_px=30) NON erano quelli
+  usati: rieseguire la Fase 2 produceva il 54% di nuclei in meno (media 74.6
+  contro 163.6 per patch su 10 patch di controllo), riscrivendo l'intera matrice
+  dei biomarcatori e con essa ogni numero della tesi.
+
+  I parametri originali sono stati ricostruiti per ricerca esaustiva su griglia
+  (min_distance × min_area_px × max_area_px × exclude_border), selezionando la
+  combinazione che riproduce le maschere salvate: min_distance=7, min_area_px=15.
+  Verifica su 60 patch estratte a caso dalle due classi: 60/60 identiche pixel
+  per pixel, zero pixel divergenti su 50.176. Il risultato non dipende da
+  max_area_px, che con questi marker non e' mai vincolante.
+
+  tests/test_segmentation_reproducibility.py fa da guardia: se un default cambia,
+  il dataset della tesi smette di essere riproducibile e il test lo segnala.
 
 STORIA DELLA RILEVAZIONE MARKER (v4.1 → v4.2, 19/08/2026):
   v4.1 — Una code review aveva evidenziato che la soglia marker storica è
@@ -91,9 +111,9 @@ _IMAGENET_STD  = [0.229, 0.224, 0.225]
 # ---------------------------------------------------------------------------
 def segment_nuclei_watershed(
     h_channel,
-    min_distance: int = 12,
+    min_distance: int = 7,
     h_maxima_px: int = 5,
-    min_area_px: int = 30,
+    min_area_px: int = 15,
     max_area_px: int = 2500,
     marker_method: str = "relative_threshold",
     peak_threshold_rel: float = 0.15,
@@ -102,10 +122,25 @@ def segment_nuclei_watershed(
     Esegue la segmentazione d'istanza dei nuclei cellulari sul canale H (Ematossilina)
     tramite Marker-Controlled Watershed e Trasformata di Distanza Euclidea (EDT).
 
-    Parametri scelti con riferimento alla biologia dei linfociti:
-      - Linfocita normale: diametro ~6–12 µm, raggio ~3–6 µm → min_distance >= 10 px.
-      - Centroblasto FL:   diametro ~8–15 µm, area fino a ~130 µm² → max_area fino a 2500 px.
+    Provenienza dei default: min_distance e min_area_px NON sono stati scelti a
+    tavolino, sono stati ricostruiti empiricamente perche' sono quelli che
+    riproducono le maschere del dataset (vedi la nota sulla riproducibilita'
+    nell'intestazione del modulo). Restano comunque coerenti con la biologia dei
+    linfociti, alla calibrazione dichiarata in src/calibration.py:
+      - Linfocita normale: diametro ~6–12 µm, raggio ~3–6 µm → 6.5–13 px. Un
+        min_distance di 7 px (≈3.2 µm) sta all'estremo inferiore dell'intervallo:
+        separa anche i nuclei piu' piccoli e ravvicinati, al prezzo di un rischio
+        di sovra-segmentazione sui nuclei grandi.
+      - Centroblasto FL: diametro ~8–15 µm, area fino a ~130 µm² → max_area fino
+        a 2500 px.
       Riferimento: Iwamoto et al. (2024), Computers in Biology and Medicine.
+
+      ATTENZIONE (storico): il vincolo "min_distance >= 10 px" riportato qui fino
+      alla v4.2 era stato derivato sotto la calibrazione errata poi corretta in
+      Fase 3, che assumeva un pixel di meta' della dimensione reale e quindi
+      raddoppiava i px corrispondenti a un dato raggio in µm. Con la calibrazione
+      corretta lo stesso ragionamento biologico porta a 6.5–13 px, e il vincolo
+      cade. Derivazione in reports/fase1_report.md.
 
     RILEVAMENTO MARKER — due metodi disponibili (vedi reports/fase2_report.md,
     sezione 7, per l'analisi completa e i dati di benchmark):
@@ -129,8 +164,11 @@ def segment_nuclei_watershed(
 
     Args:
         h_channel (np.ndarray): Canale H in scala di grigi uint8.
-        min_distance (int): Distanza minima in pixel tra centroidi locali (default 12 px ≈ 5.5 µm).
+        min_distance (int): Distanza minima in pixel tra centroidi locali (default 7 px ≈ 3.2 µm).
                             Usato solo con marker_method="relative_threshold".
+                            NON modificare senza rigenerare le Fasi 2 e 3: e' uno dei due
+                            parametri che riproducono le maschere del dataset (vedi la nota
+                            sulla riproducibilita' nell'intestazione del modulo).
         h_maxima_px (int): Prominenza minima (in px) di un massimo locale della distance
                            map per essere accettato come marker (default 5 px ≈ 1.15 µm).
                            Usato solo con marker_method="h_maxima". ATTENZIONE: h=5 è una
@@ -142,8 +180,15 @@ def segment_nuclei_watershed(
                            prima di usare questo metodo.
         peak_threshold_rel (float): Soglia relativa al massimo della distance map (default
                                     0.15). Usato solo con marker_method="relative_threshold".
-        min_area_px (int): Area minima nucleare in pixel (default 30 px ≈ 1.6 µm²).
+                                    ATTENZIONE: su questo dataset e' di fatto inerte. La
+                                    soglia vale `distance.max() * 0.15`, e il massimo reale
+                                    della distance map e' 6-13 px: la soglia risultante
+                                    (~1-2 px) non esclude alcun picco. Verificato variandola
+                                    da 0.02 a 0.15 senza alcuna variazione del conteggio.
+        min_area_px (int): Area minima nucleare in pixel (default 15 px ≈ 3.2 µm²).
                            Rimuove rumori di binarizzazione e artefatti submicron.
+                           Secondo parametro che riproduce le maschere del dataset: vedi la
+                           nota sulla riproducibilita' nell'intestazione del modulo.
         max_area_px (int): Area massima nucleare in pixel (default 2500 px ≈ 529 µm²).
                            Aumentato da 1500 a 2500 per includere centroblasti grandi
                            (Iwamoto et al. 2024: area mediana centroblasti ~55–70 µm², tail > 100 µm²).

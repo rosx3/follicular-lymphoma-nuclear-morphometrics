@@ -1,9 +1,11 @@
 # Report Finale — Fase 2: Segmentazione dei Nuclei Cellulari ed Estrazione Centroidi
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
-*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.2*  
-*Aggiornato il 19 agosto 2026 — Benchmark GPU del metodo `h_maxima` completato: default riportato a `relative_threshold` (vedi Sezione 7.7)*
+*Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.3*  
+*Aggiornato il 20 agosto 2026 — Default di segmentazione riallineati al dataset (Sezione 5.1); il benchmark risulta eseguito su una configurazione diversa da quella del dataset (Sezione 7.8)*
 
-> ✅ **Nota sui numeri di benchmark riportati in questo documento (Sezioni 2-4):** sono calcolati con `marker_method="relative_threshold"`, che a seguito del benchmark indipendente di Sezione 7.7 **è tornato a essere il metodo di default della pipeline (v4.2)**. I numeri di Sezioni 2-4 sono quindi validi e citabili in tesi come risultati della pipeline attuale.
+> ⚠️ **Nota sui numeri di benchmark riportati in questo documento (Sezioni 3 e 4): sono in revisione, da non citare in tesi.** Il benchmark indipendente invocava la segmentazione senza parametri espliciti e ha quindi misurato `min_distance=12, min_area_px=30`, **non** i parametri con cui è stato costruito il dataset (`7`/`15`, Sezione 5.1). Verificato sui conteggi `ws_n_pred`: 10 patch su 10. Il Watershed è stato valutato in una configurazione che trova $63.7$ nuclei per patch contro i $149.2$ della Ground Truth Cellpose, mentre quella reale del dataset ne trova $141.8$. Il run va rifatto per intero — procedura in **Sezione 7.8**.
+>
+> Restano invece validi: i **conteggi e i centroidi** della Sezione 2 (prodotti dai parametri corretti) e l'intera analisi metodologica delle Sezioni 6–7.7.
 
 ---
 
@@ -87,11 +89,39 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 
 | Parametro | Valore | Significato Fisico/Biologico | Riferimento |
 |---|---|---|---|
-| `min_distance` (v4.2, DEFAULT) | **12 px** ($2.8\,\mu m$) | Coerente con il raggio medio dei linfociti ($3\text{--}6\,\mu m$); usato con `marker_method="relative_threshold"` | Iwamoto et al. (2024) |
-| `peak_threshold_rel` (v4.2, DEFAULT) | **0.15** | 15% del massimo della trasformata di distanza della patch; usato con `marker_method="relative_threshold"` | Parametro esplicito |
-| `h_maxima_px` (sperimentale, NON default) | **5 px** ($1.15\,\mu m$) | Prominenza minima locale di un massimo della distance map, indipendente dal massimo globale della patch. **Taratura superata:** inferiore al default sul benchmark Cellpose — vedi Sezione 7.7 | Vincent (1993); Sezione 7 |
-| `max_area_px` | **2500 px** ($132\,\mu m^2$) | Include i centroblasti di grandi dimensioni ($>100\,\mu m^2$) | Iwamoto et al. (2024) |
+| `min_distance` (v4.3, DEFAULT) | **7 px** ($3.2\,\mu m$) | Estremo inferiore del raggio dei linfociti ($3\text{--}6\,\mu m$, cioè $6.5\text{--}13$ px): separa anche i nuclei più piccoli e ravvicinati. **Valore ricostruito** — vedi Sezione 5.1 | Sezione 5.1; Iwamoto et al. (2024) |
+| `min_area_px` (v4.3, DEFAULT) | **15 px** ($3.2\,\mu m^2$) | Soglia di rumore sotto la quale una regione non è un nucleo. **Valore ricostruito** — vedi Sezione 5.1 | Sezione 5.1 |
+| `peak_threshold_rel` (v4.2, DEFAULT) | **0.15** | 15% del massimo della trasformata di distanza della patch. **Di fatto inerte su questo dataset:** il massimo reale della distance map è 6–13 px, quindi la soglia vale 1–2 px e non esclude alcun picco (verificato da 0.02 a 0.15, conteggio invariato) | Parametro esplicito |
+| `h_maxima_px` (sperimentale, NON default) | **5 px** ($2.3\,\mu m$) | Prominenza minima locale di un massimo della distance map, indipendente dal massimo globale della patch. **Taratura superata:** inferiore al default sul benchmark Cellpose — vedi Sezione 7.7 | Vincent (1993); Sezione 7 |
+| `max_area_px` | **2500 px** ($529\,\mu m^2$) | Include i centroblasti di grandi dimensioni ($>100\,\mu m^2$). Con i marker attuali non è mai vincolante | Iwamoto et al. (2024) |
 | `microns_per_pixel` | **0.46 $\mu m$/px** | Patch esportate a $200\times$ (obiettivo $20\times$) — vedi `reports/fase1_report.md` | Dedotta da Carreras et al. (2025) |
+
+> **Nota.** Le conversioni in µm di questa tabella erano state calcolate sotto la
+> calibrazione errata poi corretta in Fase 3 (un pixel di metà della dimensione
+> reale) e sono state ricalcolate qui: $12\text{ px}$ non valevano $2.8\,\mu m$,
+> e $2500\text{ px}$ non valevano $132\,\mu m^2$.
+
+### 5.1 Ricostruzione dei parametri originali (agosto 2026)
+
+Le 600 maschere in `data/fase2_segmentation/` furono generate al commit `9c59248`,
+quando `run_pipeline.py` non esisteva ancora: la Fase 2 girò da un runner esterno
+al repository e i suoi parametri non furono registrati — `segmentation_metadata.json`
+salva i risultati, non i parametri dei marker.
+
+I default rimasti nel modulo (`min_distance=12`, `min_area_px=30`) **non erano quelli
+usati**. Rieseguire la Fase 2 con essi produceva il **54% di nuclei in meno** (media
+$74.6$ contro $163.6$ per patch su 10 patch di controllo): il comando di riproduzione
+documentato nel README avrebbe riscritto l'intera matrice dei biomarcatori, e con essa
+ogni numero della Fase 3.
+
+I valori originali sono stati ricostruiti per ricerca esaustiva su griglia
+(`min_distance` × `min_area_px` × `max_area_px` × `exclude_border`), selezionando la
+combinazione che riproduce le maschere salvate. Verifica su **60 patch estratte a caso**
+dalle due classi: **60/60 identiche pixel per pixel**, zero pixel divergenti su 50.176.
+Il risultato non dipende da `max_area_px`, che con questi marker non è mai vincolante.
+
+`tests/test_segmentation_reproducibility.py` fa da guardia: se un default cambia, il
+dataset della tesi smette di essere riproducibile e il test lo segnala.
 
 ---
 
@@ -261,3 +291,47 @@ Due osservazioni emerse dal confronto tra questo run e quello di Sezione 3.2, **
 
 1. **AJI del Watershed legacy: $0.3097$ (qui) vs $0.3255$ (Sezione 3.2).** Dice, IoU e F1 sono invece *identici alla quarta cifra decimale*, e il Watershed è deterministico. La discrepanza è quindi imputabile esclusivamente alla metrica: questo run include il **FIX A** (Sezione 6), che ha corretto l'accoppiamento non univoco nel calcolo dell'AJI. Il valore **$0.3097$ è quello corretto**; $0.3255$ era lievemente inflazionato dal bug. *Da usare $0.3097$ nella tesi.*
 2. **Metriche U-Net: forte varianza run-to-run.** La rete viene ri-addestrata a ogni esecuzione (15 epoche, inizializzazione e split casuali). Sulle stesse patch si osservano Dice $0.5738$ (Sezione 3.2) e $0.5062$ (questo run); in un terzo run su patch diverse ([`segmentation_benchmark_v2_cellpose_gt.csv`](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/segmentation_benchmark_v2_cellpose_gt.csv)) la U-Net risultava addirittura *superiore* al Watershed ($0.6896$ vs $0.6269$). **La conclusione "Watershed > U-Net" di Sezione 4 va quindi presentata con cautela**: è solida sulle metriche d'istanza (AJI e F1, dove il Watershed vince in tutti i run disponibili), ma non robusta sul solo Dice pixel-level. Per una dichiarazione statisticamente difendibile in tesi servirebbe una media su più seed di addestramento — azione consigliata prima della consegna.
+
+---
+
+## 7.8 Il Benchmark Misurava una Configurazione Diversa dal Dataset (v4.3) — 20 agosto 2026
+
+### 7.8.1 Il Fatto
+
+Lo script Colab ([`scratch/run_colab_benchmark.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/scratch/run_colab_benchmark.py)) invocava la segmentazione **senza passare parametri**, ereditando i default del modulo. Quando i run furono eseguiti quei default erano `min_distance=12, min_area_px=30` — che, come stabilito nella Sezione 5.1, **non sono i parametri con cui è stato costruito il dataset della tesi**.
+
+La verifica è diretta e non richiede la Ground Truth: `segmentation_benchmark_v2_cellpose_gt.csv` registra `ws_n_pred`, il numero di nuclei trovati dal Watershed durante il benchmark. Ricalcolandolo sulle stesse patch:
+
+| Configurazione | Corrispondenze esatte con `ws_n_pred` | Scarto medio |
+|---|---|---|
+| `min_distance=12, min_area_px=30` | **10 / 10** | 0.00 |
+| `min_distance=7, min_area_px=15` (dataset) | 0 / 10 | 78.10 |
+
+### 7.8.2 Perché Importa
+
+| | Nuclei per patch |
+|---|---|
+| Ground Truth Cellpose | **149.2** |
+| Dataset della tesi (parametri corretti) | **141.8** |
+| Watershed *come benchmarkato* | **63.7** |
+
+Il Watershed è stato valutato in una configurazione che rileva il 43% dei nuclei trovati da Cellpose, mentre quella effettivamente usata per costruire il dataset ne rileva il 95%. Il recall di detection registrato ($0.23$–$0.26$) era quindi limitato alla radice, e con esso l'F1. **Le metriche pubblicate non descrivono la segmentazione su cui poggia la Fase 3.**
+
+Non se ne può dedurre in che direzione cambieranno i risultati: un conteggio più vicino alla GT alza il recall, ma marker più fitti possono sovra-segmentare e penalizzare l'AJI. Va misurato, non previsto.
+
+### 7.8.3 Perché Va Rifatto per Intero e non Ri-scorato
+
+La U-Net è addestrata sulle maschere Watershed dei 20 patch di train. Cambiando i parametri cambia il suo **target di addestramento**: un confronto fra una U-Net addestrata sui vecchi target e un Watershed nuovo non avrebbe significato. Inoltre la Ground Truth Cellpose non è mai stata salvata su disco — era un dizionario in memoria, perduto con la sessione Colab — quindi non esiste nulla da ri-scorare.
+
+### 7.8.4 Procedura per la Riesecuzione
+
+1. `python scratch/build_colab_bundle.py` — assembla `colab_benchmark.zip` con le 30 patch dello Step 2.2 e il modulo di segmentazione **corrente**. Assemblarlo da script elimina il rischio di caricare su Colab una versione diversa del modulo, che è precisamente l'origine di questo problema.
+2. Su Colab: caricare l'archivio, `!pip install cellpose`, `!python run_colab_benchmark.py`.
+3. Riportare nel repository **tre** artefatti: `colab_benchmark_results.csv`, `benchmark_metadata.json` (versioni, parametri, split) e la cartella `cellpose_gt_masks/`. Senza il terzo il run tornerebbe non verificabile.
+4. Aggiornare `segmentation_metadata.json`, la Sezione 4 di questo report e l'avviso nel README.
+
+La versione `v4` dello script salva la GT su disco, passa i parametri esplicitamente tramite `WS_PARAMS` e registra la propria provenienza. [`tests/test_colab_benchmark_script.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/tests/test_colab_benchmark_script.py) fa da guardia sulle tre proprietà, ispezionando il sorgente: lo script non è eseguibile in locale, ma il ripetersi dell'errore è rilevabile.
+
+### 7.8.5 Lezione Metodologica
+
+È la seconda volta che il progetto paga lo stesso schema: **un runner fuori dal repository che chiama la pipeline coi default impliciti**. La prima è costata la riproducibilità delle 600 maschere (Sezione 5.1), la seconda la validità del benchmark. Il difetto non è nei valori dei parametri ma nel non dichiararli: un default è una decisione che si può cambiare senza accorgersi di aver cambiato anche tutti i risultati che vi dipendevano.
