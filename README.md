@@ -119,20 +119,20 @@ testNuovoTesi/
 - **Algoritmo Operativo:** Marker-Controlled Distance-Transform Watershed ($7\text{ px} \approx 3.2\,\mu m$ min distance, area nucleare ammessa $15$–$2500\text{ px}$).
 - **Riproducibilità dei parametri (agosto 2026):** le 600 maschere furono generate da un runner esterno al repository, prima che `run_pipeline.py` esistesse, e i suoi parametri non erano registrati da nessuna parte. I default rimasti nel modulo non erano quelli usati, e rieseguire la Fase 2 produceva il **54% di nuclei in meno**. I valori originali sono stati ricostruiti per ricerca su griglia e verificati su 60 patch estratte a caso: **60/60 identiche pixel per pixel** alle maschere del dataset. `tests/test_segmentation_reproducibility.py` impedisce che si perdano di nuovo.
 - **Nuclei Estratti:** **94.042 nuclei totali** registrati nel file `centroids_all.csv`.
-- **Validazione Indipendente su GPU (Cellpose v4.x Oracle GT, $d=22.0\text{ px} \approx 10.1\,\mu m$):**
-  - **Dice Score (Pixel-level):** Watershed **$63.73\% \pm 10.91\%$** vs U-Net ResNet-34 **$57.38\% \pm 12.60\%$**
-  - **AJI Index (Instance-level):** Watershed **$0.3097 \pm 0.0723$** vs U-Net ResNet-34 **$0.2873 \pm 0.0645$**
-  - **F1 Detection Score:** Watershed **$0.4101 \pm 0.0716$** vs U-Net ResNet-34 **$0.3508 \pm 0.0882$**
+- **Validazione Indipendente su GPU** (Cellpose Oracle GT, $d=22.0\text{ px} \approx 10.1\,\mu m$; $n=10$ patch di validazione, run del 20 agosto 2026):
 
-> ⚠️ **Questi numeri sono in revisione: non citarli finché il benchmark non è rieseguito.** Due problemi accertati.
->
-> **1. Il benchmark misurava la configurazione sbagliata.** Lo script Colab invocava la segmentazione senza parametri, ereditando i default del modulo (`min_distance=12, min_area_px=30`) invece di quelli che hanno prodotto il dataset. Verificato sui conteggi `ws_n_pred` registrati: **10 patch su 10**. Il watershed fu quindi valutato in una configurazione che trova **63.7 nuclei per patch** contro i **149.2** della GT Cellpose, mentre quella reale del dataset ne trova **141.8** — a 5% da Cellpose. Recall e F1 di detection erano limitati alla radice.
->
-> **2. I run registrati si contraddicono sul Dice.** `colab_benchmark_results.csv` dà Watershed Dice 0.6373 > U-Net 0.5738; `segmentation_benchmark_v2_cellpose_gt.csv` dà **U-Net 0.6896 > Watershed 0.6269**. I due val set condividono solo 4 patch su 10, e la U-Net viene riaddestrata a ogni run. Il fatto è già analizzato in [`reports/fase2_report.md`](reports/fase2_report.md) §7.7.5, che raccomanda una media su più seed prima di sostenere la conclusione: era quel README a non riportarne la cautela.
->
-> La Ground Truth Cellpose non è nel repository — il run originale la teneva in memoria e non la salvava — quindi le metriche non sono ricalcolabili senza rigenerarla. Il benchmark va rifatto per intero: la U-Net è addestrata sulle maschere watershed, quindi correggere i parametri le cambia il target. Procedura in [`reports/fase2_report.md`](reports/fase2_report.md) §7.8.
+  | Metrica | Watershed zero-shot | U-Net ResNet-34 | Esito |
+  |---|:---:|:---:|:---:|
+  | Dice (pixel) | $0.7950 \pm 0.0442$ | $0.8038 \pm 0.0427$ | $p = 0.19$ |
+  | IoU (pixel) | $0.6620 \pm 0.0598$ | $0.6740 \pm 0.0585$ | — |
+  | AJI (istanza) | $0.5411 \pm 0.0730$ | $0.5370 \pm 0.0593$ | $p = 0.65$ |
+  | F1 detection @0.5 | $0.7108 \pm 0.0718$ | $0.7164 \pm 0.0509$ | $p = 0.92$ |
 
-- **Risultato Principale (in revisione):** l'ipotesi di lavoro è che il Watershed zero-shot guidato dalla fisica dell'assorbimento cromatico regga il confronto con la U-Net, immune all'overfitting da campioni limitati. La verifica sperimentale è però quella descritta nell'avviso qui sopra, e va rifatta prima che l'affermazione possa essere sostenuta.
+  Test di Wilcoxon appaiato sulle 10 patch; vittorie del Watershed 4/10, 5/10 e 5/10.
+
+- **Risultato Principale:** un algoritmo **deterministico e zero-shot eguaglia una U-Net ResNet-34 addestrata sul dominio**. Le differenze non sono statisticamente distinguibili su nessuna delle tre metriche, e il Watershed raggiunge questo risultato **senza alcun addestramento**, senza dati etichettati e in modo perfettamente riproducibile. Il Watershed recupera l'**85%** dei nuclei della Ground Truth Cellpose (la U-Net l'80%).
+
+> **Nota storica — perché i numeri sono cambiati.** Fino al 20 agosto 2026 questa sezione riportava Dice $0.6373$ vs $0.5738$ e concludeva per la superiorità del Watershed. Quel benchmark invocava la segmentazione senza parametri espliciti e misurava quindi `min_distance=12, min_area_px=30`, **non** i parametri con cui è stato costruito il dataset (verificato sui conteggi `ws_n_pred`: 10 patch su 10). Corretti i parametri, entrambi i metodi migliorano nettamente — il Watershed +66% di AJI e +73% di F1, la U-Net ancora di più perché era addestrata su quelle stesse maschere — e il vantaggio del Watershed sparisce. Analisi completa in [`reports/fase2_report.md`](reports/fase2_report.md) §7.8.
 
 ### Fase 3: Estrazione dei Biomarcatori e Separabilità Statistica
 - **Matrice prodotta:** **600 patch × 50 colonne** (47 biomarcatori + 3 metadati), da 94.042 nuclei. Zero errori, zero valori mancanti.
