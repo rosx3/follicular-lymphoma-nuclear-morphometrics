@@ -274,7 +274,15 @@ print('\n[SUCCESS] File "colab_benchmark_results.csv" generato con successo!')
 # i numeri pubblicati. Qui si registra tutto cio' che serve a rifare il run.
 import cellpose
 
-cellpose_version = getattr(cellpose, '__version__', 'sconosciuta')
+# cellpose non espone __version__ in tutte le release (nel run del 20/08/2026 il
+# solo getattr ha registrato "sconosciuta", rendendo il run non riproducibile per
+# la ragione che questo blocco doveva prevenire). I metadati del pacchetto
+# installato sono la fonte affidabile.
+try:
+    from importlib.metadata import version as _pkg_version
+    cellpose_version = _pkg_version('cellpose')
+except Exception:
+    cellpose_version = getattr(cellpose, '__version__', 'sconosciuta')
 benchmark_metadata = {
     'version': 'v4',
     'step': 'Fase 2 — Benchmark GT Cellpose indipendente + U-Net ResNet-34',

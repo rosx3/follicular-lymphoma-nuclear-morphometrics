@@ -1,11 +1,11 @@
 # Report Finale — Fase 2: Segmentazione dei Nuclei Cellulari ed Estrazione Centroidi
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
 *Modulo: [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py) — Versione 4.3*  
-*Aggiornato il 20 agosto 2026 — Default di segmentazione riallineati al dataset (Sezione 5.1); il benchmark risulta eseguito su una configurazione diversa da quella del dataset (Sezione 7.8)*
+*Aggiornato il 20 agosto 2026 — Default di segmentazione riallineati al dataset (Sezione 5.1) e benchmark indipendente rieseguito con quei parametri, Ground Truth conservata (Sezione 7.8)*
 
-> ⚠️ **Nota sui numeri di benchmark riportati in questo documento (Sezioni 3 e 4): sono in revisione, da non citare in tesi.** Il benchmark indipendente invocava la segmentazione senza parametri espliciti e ha quindi misurato `min_distance=12, min_area_px=30`, **non** i parametri con cui è stato costruito il dataset (`7`/`15`, Sezione 5.1). Verificato sui conteggi `ws_n_pred`: 10 patch su 10. Il Watershed è stato valutato in una configurazione che trova $63.7$ nuclei per patch contro i $149.2$ della Ground Truth Cellpose, mentre quella reale del dataset ne trova $141.8$. Il run va rifatto per intero — procedura in **Sezione 7.8**.
+> ✅ **Nota sui numeri di benchmark riportati in questo documento (Sezioni 3 e 4).** Provengono dal run del **20 agosto 2026**, eseguito con i parametri di segmentazione del dataset (`min_distance=7, min_area_px=15`) passati esplicitamente, Ground Truth Cellpose **salvata su disco** in `data/ground_truth/cellpose_v4/` e provenienza registrata in `benchmark_v4_metadata.json`. Sono citabili in tesi.
 >
-> Restano invece validi: i **conteggi e i centroidi** della Sezione 2 (prodotti dai parametri corretti) e l'intera analisi metodologica delle Sezioni 6–7.7.
+> I numeri precedenti (Dice $0.6373$ vs $0.5738$) provenivano da un run che misurava una configurazione diversa da quella del dataset: restano nel documento solo come storia, in **Sezione 7.8**. **Non mescolare metriche di run diversi**: ogni run ha la propria Ground Truth Cellpose, e quelle dei run precedenti non furono mai salvate.
 
 ---
 
@@ -47,21 +47,26 @@ Per garantire il massimo rigore scientifico ed evitare la circolarità della val
 
 ### 3.2 Tabella Risultati Benchmark (GT Indipendente Cellpose, $n=10$)
 
+*Run del 20 agosto 2026 — [`segmentation_benchmark_v4_cellpose_gt.csv`](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/segmentation_benchmark_v4_cellpose_gt.csv), GT in `data/ground_truth/cellpose_v4/`.*
+
 | Modello di Segmentazione | Dice (Pixel) | IoU (Pixel) | AJI (Instance) | F1 Detection @0.5 |
 | :--- | :---: | :---: | :---: | :---: |
-| 🥇 **Marker-Controlled Watershed Zero-Shot** | **$0.6373 \pm 0.1091$** | **$0.4763 \pm 0.1081$** | **$0.3097 \pm 0.0723$** ⁽¹⁾ | **$0.4101 \pm 0.0716$** |
-| 🥈 **PyTorch U-Net (ResNet-34 Backbone)** | $0.5738 \pm 0.1260$ | $0.4124 \pm 0.1136$ | $0.2873 \pm 0.0645$ | $0.3508 \pm 0.0882$ ⁽²⁾ |
+| **Marker-Controlled Watershed Zero-Shot** | $0.7950 \pm 0.0442$ | $0.6620 \pm 0.0598$ | **$0.5411 \pm 0.0730$** | $0.7108 \pm 0.0718$ |
+| **PyTorch U-Net (ResNet-34 Backbone)** | **$0.8038 \pm 0.0427$** | **$0.6740 \pm 0.0585$** | $0.5370 \pm 0.0593$ | **$0.7164 \pm 0.0509$** |
 
-⁽¹⁾ Valore aggiornato al calcolo **post-FIX A** (Sezione 6). Il valore precedentemente riportato ($0.3255$) era lievemente inflazionato dal bug di accoppiamento non univoco nell'AJI. Vedi Sezione 7.7.5.
-⁽²⁾ Le metriche U-Net presentano forte varianza run-to-run (rete ri-addestrata a ogni esecuzione): vedi Sezione 7.7.5 per l'intervallo osservato e le implicazioni sulle conclusioni di Sezione 4.
+**Le differenze non sono statisticamente distinguibili.** Test di Wilcoxon appaiato sulle stesse 10 patch: Dice $p=0.193$ (Watershed vince in 4 patch su 10), AJI $p=0.652$ (5/10), F1 detection $p=0.922$ (5/10). Il grassetto segnala il valore più alto, non un vantaggio dimostrato.
+
+**Detection.** Ground Truth Cellpose $196.9$ nuclei/patch in media; Watershed $167.5$ ($85\%$), U-Net $157.8$ ($80\%$). Entrambi sotto-rilevano rispetto a Cellpose, il Watershed un po' meno.
 
 #### Breakdown per Classe Istologica (Watershed vs U-Net):
 - **Linfoma Follicolare (FL):**
-  - *Watershed:* Dice $0.6413$, AJI $0.3400$, F1 Detection $0.4419$
-  - *U-Net ResNet-34:* Dice $0.5919$, AJI $0.3030$, F1 Detection $0.3864$
+  - *Watershed:* Dice $0.8119$, AJI $0.5697$, F1 Detection $0.7420$
+  - *U-Net ResNet-34:* Dice $0.8172$, AJI $0.5499$, F1 Detection $0.7238$
 - **Tessuto Reattivo (REACTIVE):**
-  - *Watershed:* Dice $0.6332$, AJI $0.3110$, F1 Detection $0.3782$
-  - *U-Net ResNet-34:* Dice $0.5557$, AJI $0.2717$, F1 Detection $0.3152$
+  - *Watershed:* Dice $0.7781$, AJI $0.5126$, F1 Detection $0.6797$
+  - *U-Net ResNet-34:* Dice $0.7903$, AJI $0.5241$, F1 Detection $0.7090$
+
+Il vantaggio d'istanza del Watershed si concentra nelle patch FL (AJI $0.5697$ vs $0.5499$, F1 $0.7420$ vs $0.7238$) e si inverte nel tessuto reattivo. Con $n=5$ per classe si tratta di un'indicazione, non di un risultato.
 
 ---
 
@@ -71,17 +76,18 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 
 ### 🎓 Conclusioni da Inserire nella Tesi:
 
-1. **Superiorità del Watershed Zero-Shot guidato dalla Fisica:**
-   L'algoritmo **Marker-Controlled Watershed applicato al canale H deconvoluto con Macenko** supera la rete neurale U-Net ResNet-34 sulle metriche d'istanza (AJI $0.3097$ vs $0.2873$, F1 $0.4101$ vs $0.3508$) e, in questo run, anche a livello di pixel (Dice $63.7\%$ vs $57.4\%$).  
-   *Spiegazione scientifica:* La decomposizione cromatica in Densità Ottica (OD space) isola la cromaticità dell'ematossilina in modo analitico e privo di bias di addestramento. Questo rende il Watershed immune all'overfitting che colpisce le reti deep quando addestrate su dataset limitati di patch.  
-   ⚠️ *Cautela statistica (vedi Sezione 7.7.5):* il vantaggio è **consistente su AJI e F1 in tutti i run disponibili**, ma **non robusto sul solo Dice pixel-level**, dove in un run su patch diverse la U-Net è risultata superiore. Formulare la conclusione in tesi privilegiando le metriche d'istanza, o mediare su più seed di addestramento prima della consegna.
+1. **Un Algoritmo Zero-Shot Eguaglia una Rete Addestrata sul Dominio:**
+   Il **Marker-Controlled Watershed applicato al canale H deconvoluto con Macenko** ottiene prestazioni **statisticamente indistinguibili** da una U-Net ResNet-34 addestrata sulle patch del dataset: Dice $0.7950$ vs $0.8038$ ($p=0.193$), AJI $0.5411$ vs $0.5370$ ($p=0.652$), F1 detection $0.7108$ vs $0.7164$ ($p=0.922$), con vittorie ripartite 4/10 e 5/10 sulle singole patch.
+   *Perché è un risultato e non un pareggio banale:* il Watershed raggiunge quel livello **senza alcun addestramento, senza dati etichettati e in modo deterministico** — la stessa immagine dà sempre la stessa maschera, mentre la U-Net va riaddestrata e mostra varianza run-to-run (Sezione 7.7.5). La decomposizione in Densità Ottica isola la cromaticità dell'ematossilina in modo analitico e privo di bias di addestramento: è il *costo* del secondo metodo, non la sua accuratezza, a fare la differenza.
+   ⚠️ *Formulazione corretta per la tesi:* **non** rivendicare superiorità del Watershed. Con $n=10$ patch e un solo seed di addestramento i dati non la sostengono, e la formulazione precedente ("supera la U-Net") si fondava su un benchmark che misurava parametri di segmentazione diversi da quelli del dataset (Sezione 7.8). La rivendicazione difendibile è la parità a costo nullo.
 
 2. **Risoluzione Rigorosa della Circolarità della Validazione:**
    L'uso di una Ground Truth generata da un modello esterno super partes (Cellpose v4.x, *Stringer et al., 2021*) ricalibrato alla dimensione dei nuclei linfocitari ($d = 22.0\text{ px} \approx 10.1\,\mu m$) ha permesso di eliminare il bias di autovalutazione.  
-   L'accordo di Dice del $63.7\%$ e l'AJI di $0.3097$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando perfettamente negli intervalli di concordanza standard riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
+   L'accordo di Dice del $79.5\%$ e l'AJI di $0.5411$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando negli intervalli di concordanza riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
+   La Ground Truth di questo run è **conservata** in `data/ground_truth/cellpose_v4/` (10 maschere, PNG 16-bit): a differenza dei run precedenti, le metriche qui riportate sono ricalcolabili da chiunque.
 
 3. **Maggiore F1-Detection nel Linfoma Follicolare (FL):**
-   Sia il Watershed ($F1 = 0.4419$) che la U-Net ($F1 = 0.3864$) ottengono prestazioni superiori nelle patch FL rispetto a quelle RE ($0.3782$ e $0.3152$). Questo conferma l'ipotesi patologica che l'impaccamento e l'ipercromasia dei nuclei linfomatosi forniscono un contrasto di gradiente più netto nel canale Ematossilina rispetto al tessuto reattivo.
+   Sia il Watershed ($F1 = 0.7420$ su FL contro $0.6797$ su REACTIVE) che la U-Net ($0.7238$ contro $0.7090$) ottengono prestazioni superiori nelle patch FL. Questo è coerente con l'ipotesi patologica che l'impaccamento e l'ipercromasia dei nuclei linfomatosi forniscano un contrasto di gradiente più netto nel canale Ematossilina rispetto al tessuto reattivo. Il divario è però netto solo per il Watershed ($+0.062$) e marginale per la U-Net ($+0.015$), e poggia su $n=5$ patch per classe: va presentato come indicazione.
 
 ---
 
@@ -335,3 +341,29 @@ La versione `v4` dello script salva la GT su disco, passa i parametri esplicitam
 ### 7.8.5 Lezione Metodologica
 
 È la seconda volta che il progetto paga lo stesso schema: **un runner fuori dal repository che chiama la pipeline coi default impliciti**. La prima è costata la riproducibilità delle 600 maschere (Sezione 5.1), la seconda la validità del benchmark. Il difetto non è nei valori dei parametri ma nel non dichiararli: un default è una decisione che si può cambiare senza accorgersi di aver cambiato anche tutti i risultati che vi dipendevano.
+
+### 7.8.6 Esito della Riesecuzione (20 agosto 2026)
+
+Il benchmark è stato rieseguito su Colab con lo script v4: parametri espliciti, Ground Truth salvata, provenienza registrata. Il seed dello split (42) sulle stesse 30 patch ha riprodotto **le stesse 10 patch di validazione** del run originale, quindi il confronto prima/dopo è appaiato.
+
+| Metrica | Watershed prima (12/30) | Watershed ora (7/15) | Δ |
+|---|:---:|:---:|:---:|
+| Dice | $0.6373$ | $0.7950$ | **+25%** |
+| AJI | $0.3255$ | $0.5411$ | **+66%** |
+| F1 detection | $0.4101$ | $0.7108$ | **+73%** |
+
+| Metrica | U-Net prima | U-Net ora | Δ |
+|---|:---:|:---:|:---:|
+| Dice | $0.5738$ | $0.8038$ | **+40%** |
+| AJI | $0.2873$ | $0.5370$ | **+87%** |
+| F1 detection | $0.3508$ | $0.7164$ | **+104%** |
+
+**Due letture, entrambe importanti per la tesi.**
+
+*La prima:* il benchmark precedente sottostimava gravemente la pipeline. Il Watershed non passava da $0.41$ di F1 perché fosse un metodo debole, ma perché stava girando con `min_distance=12`, che ne dimezzava le rilevazioni. La detection passa dal $43\%$ all'$85\%$ dei nuclei di Cellpose.
+
+*La seconda:* il guadagno della U-Net è ancora maggiore, perché il suo **target di addestramento** erano proprio quelle maschere. Corretti i parametri, il vantaggio del Watershed sparisce e i due metodi diventano indistinguibili (Sezione 3.2). La conclusione della Sezione 4 è stata riscritta di conseguenza: non superiorità, ma **parità a costo di addestramento nullo**.
+
+**Limite di confrontabilità.** La Ground Truth di questo run non è la stessa dei run precedenti — è stata rigenerata con la versione di cellpose disponibile su Colab nell'agosto 2026, e le GT vecchie non erano state salvate. Sulle 4 patch condivise col run v2 i conteggi differiscono dell'$1$–$8\%$: troppo poco per spiegare salti del $66$–$73\%$, ma il confronto prima/dopo **non è a Ground Truth costante** e va dichiarato così. Da questo run in poi il problema non si ripresenta: le maschere sono in `data/ground_truth/cellpose_v4/`.
+
+**Difetto residuo dello script.** Il campo `cellpose_version` di `benchmark_v4_metadata.json` riporta `"sconosciuta"`: cellpose non espone `__version__` nella release usata, e il blocco di provenienza non aveva un fallback. Corretto nello script (ora legge i metadati del pacchetto con `importlib.metadata`), ma **per questo run la versione esatta resta ignota** — l'unico dato di provenienza mancante.
