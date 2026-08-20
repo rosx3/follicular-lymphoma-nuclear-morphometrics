@@ -1,0 +1,31 @@
+validation,model,fold,auc_roc,balanced_accuracy,sensitivity,specificity,n_train,n_test,best_params
+A_casuale,logistic_regression,0,0.9149999999999999,0.8333333333333334,0.8333333333333334,0.8333333333333334,480,120,{'model__C': 1.0}
+A_casuale,random_forest,0,0.9544444444444445,0.85,0.85,0.85,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+A_casuale,xgboost,0,0.9658333333333333,0.8833333333333333,0.8833333333333333,0.8833333333333333,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 3, 'model__n_estimators': 300}"
+A_casuale,logistic_regression,1,0.9219444444444445,0.85,0.85,0.85,480,120,{'model__C': 1.0}
+A_casuale,random_forest,1,0.9533333333333334,0.8416666666666667,0.8,0.8833333333333333,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+A_casuale,xgboost,1,0.9422222222222223,0.8416666666666667,0.8333333333333334,0.85,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+A_casuale,logistic_regression,2,0.8980555555555555,0.8500000000000001,0.9,0.8,480,120,{'model__C': 1.0}
+A_casuale,random_forest,2,0.9691666666666666,0.9,0.9333333333333333,0.8666666666666667,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+A_casuale,xgboost,2,0.9733333333333334,0.925,0.95,0.9,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 3, 'model__n_estimators': 300}"
+A_casuale,logistic_regression,3,0.9241666666666667,0.8416666666666667,0.85,0.8333333333333334,480,120,{'model__C': 10.0}
+A_casuale,random_forest,3,0.9573611111111111,0.8666666666666667,0.85,0.8833333333333333,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+A_casuale,xgboost,3,0.9694444444444444,0.9083333333333333,0.9,0.9166666666666666,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+A_casuale,logistic_regression,4,0.9313888888888889,0.8666666666666667,0.7833333333333333,0.95,480,120,{'model__C': 1.0}
+A_casuale,random_forest,4,0.9665277777777778,0.8999999999999999,0.85,0.95,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+A_casuale,xgboost,4,0.9730555555555556,0.8999999999999999,0.85,0.95,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+B_blocchi,logistic_regression,0,0.9372222222222222,0.8833333333333333,0.9833333333333333,0.7833333333333333,480,120,{'model__C': 1.0}
+B_blocchi,random_forest,0,0.9745833333333334,0.8999999999999999,0.9833333333333333,0.8166666666666667,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+B_blocchi,xgboost,0,0.9669444444444444,0.9166666666666667,0.9666666666666667,0.8666666666666667,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+B_blocchi,logistic_regression,1,0.9819444444444444,0.9,0.9666666666666667,0.8333333333333334,480,120,{'model__C': 1.0}
+B_blocchi,random_forest,1,0.9736111111111111,0.8916666666666666,0.9166666666666666,0.8666666666666667,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+B_blocchi,xgboost,1,0.9802777777777777,0.9083333333333333,0.9333333333333333,0.8833333333333333,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 3, 'model__n_estimators': 300}"
+B_blocchi,logistic_regression,2,0.9536111111111111,0.85,0.8166666666666667,0.8833333333333333,480,120,{'model__C': 1.0}
+B_blocchi,random_forest,2,0.954861111111111,0.8666666666666667,0.85,0.8833333333333333,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+B_blocchi,xgboost,2,0.9563888888888888,0.8666666666666667,0.8333333333333334,0.9,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+B_blocchi,logistic_regression,3,0.8075,0.7666666666666666,0.6333333333333333,0.9,480,120,{'model__C': 10.0}
+B_blocchi,random_forest,3,0.9191666666666666,0.7916666666666667,0.6833333333333333,0.9,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+B_blocchi,xgboost,3,0.8938888888888888,0.8166666666666667,0.7,0.9333333333333333,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
+B_blocchi,logistic_regression,4,0.8155555555555555,0.7333333333333334,0.6166666666666667,0.85,480,120,{'model__C': 0.1}
+B_blocchi,random_forest,4,0.8584722222222222,0.7666666666666666,0.65,0.8833333333333333,480,120,"{'model__max_depth': None, 'model__min_samples_leaf': 1, 'model__n_estimators': 300}"
+B_blocchi,xgboost,4,0.9027777777777778,0.8,0.6833333333333333,0.9166666666666666,480,120,"{'model__learning_rate': 0.05, 'model__max_depth': 6, 'model__n_estimators': 300}"
