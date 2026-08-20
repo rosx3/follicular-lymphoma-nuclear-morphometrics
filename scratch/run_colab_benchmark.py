@@ -1,7 +1,39 @@
 """
 ===============================================================================
-Script autonomo per Google Colab (GPU T4) — v3 (Diametro Calibrato 22 px)
+Script autonomo per Google Colab (GPU T4) — v4
 Esegue il Benchmark Fase 2 con GT Cellpose indipendente + U-Net ResNet-34
+===============================================================================
+COSA CAMBIA RISPETTO A v3, E PERCHE'
+
+  1. PARAMETRI DI SEGMENTAZIONE ESPLICITI. La v3 invocava la segmentazione senza
+     passare alcun parametro, affidandosi ai default del modulo.
+     Quando il run originale fu eseguito quei default erano min_distance=12 e
+     min_area_px=30, che NON sono i parametri con cui e' stato costruito il
+     dataset della tesi: il benchmark misurava quindi una configurazione che
+     trovava il 43% dei nuclei della GT Cellpose (63.7 contro 149.2 per patch),
+     mentre quella reale del dataset ne trova 141.8. Recall e F1 di detection
+     erano limitati alla radice. Ricostruzione documentata in
+     reports/fase2_report.md §5.1; verifica sui conteggi `ws_n_pred` registrati
+     in segmentation_benchmark_v2_cellpose_gt.csv: 10 patch su 10.
+     Qui i parametri sono dichiarati una volta in WS_PARAMS e passati a ogni
+     chiamata, cosi' cio' che si misura non dipende piu' dai default.
+
+  2. LA GT CELLPOSE VIENE SALVATA SU DISCO. La v3 la teneva in un dizionario in
+     memoria: alla chiusura della sessione Colab e' andata persa, e le metriche
+     pubblicate nella tesi non sono piu' verificabili ne' ricalcolabili senza
+     rigenerare tutto. Ora ogni maschera e' scritta come PNG 16-bit e finisce
+     nell'archivio dei risultati.
+
+  3. PROVENIENZA REGISTRATA. La versione di cellpose non era fissata da nessuna
+     parte ("v4.x" nei metadati non basta a rigenerare la stessa GT). Ora
+     benchmark_metadata.json raccoglie versioni, parametri, split e device.
+
+  La U-Net viene riaddestrata sulle maschere watershed prodotte con i parametri
+  corretti: il suo target di addestramento cambia insieme a essi, quindi il run
+  va rifatto per intero, non ri-scorato.
+
+  Le guardie sono in tests/test_colab_benchmark_script.py (ispezionano il
+  sorgente: qui non si puo' eseguire nulla, manca cellpose).
 ===============================================================================
 """
 
@@ -40,6 +72,19 @@ print(f'[INFO] Device in uso: {device} ({torch.cuda.get_device_name(0) if torch.
 
 BASE_DIR = Path('.')
 FASE1_DIR = BASE_DIR / 'data' / 'fase1_preprocessing'
+
+# Parametri della segmentazione, dichiarati esplicitamente e passati a OGNI
+# chiamata: sono quelli che riproducono le 600 maschere del dataset (verifica su
+# 60 patch, identiche pixel per pixel — vedi reports/fase2_report.md §5.1).
+# NON sostituirli con i default del modulo: e' l'errore che ha reso il benchmark
+# precedente non rappresentativo del dataset che pretendeva di validare.
+WS_PARAMS = dict(min_distance=7, min_area_px=15, max_area_px=2500,
+                 marker_method='relative_threshold', peak_threshold_rel=0.15)
+
+# La GT di Cellpose va conservata: senza le maschere su disco le metriche
+# pubblicate non sono verificabili da nessuno, autore compreso.
+GT_DIR = BASE_DIR / 'cellpose_gt_masks'
+GT_DIR.mkdir(exist_ok=True)
 
 # Rilevamento dinamico delle patch effettivamente estratte da colab_benchmark.zip
 fl_h_dir = FASE1_DIR / 'follicular_lymphoma' / 'h_channel'
@@ -88,7 +133,13 @@ for p in val_patches:
     
     masks, _, _ = cp_model.eval(h_img, diameter=CALIBRATED_DIAMETER_PX, channels=[0,0], flow_threshold=0.4, cellprob_threshold=0.0)
     cellpose_gt[name] = masks.astype(np.int32)
-    print(f'  [Val GT] {name[:30]:30s} -> {masks.max()} nuclei trovati da Cellpose')
+
+    # Persistenza immediata della GT: e' l'artefatto che rende il benchmark
+    # verificabile a posteriori, e nel run precedente e' andato perduto.
+    gt_path = GT_DIR / f'{name}_cellpose_gt.png'
+    cv2.imwrite(str(gt_path), masks.astype(np.uint16))
+
+    print(f'  [Val GT] {name[:30]:30s} -> {masks.max()} nuclei trovati da Cellpose  [salvata: {gt_path.name}]')
 
 print(f'[Cellpose] GT generata in {time.time()-t0_cp:.1f} secondi su {"GPU" if cp_gpu else "CPU"}.')
 
@@ -99,7 +150,9 @@ for p in train_patches:
     cat = 'follicular_lymphoma' if p['category'] == 'Follicular Lymphoma' else 'reactive_tissue'
     h_path = FASE1_DIR / cat / 'h_channel' / f'{name}_hchannel.png'
     h_img = cv2.imread(str(h_path), cv2.IMREAD_GRAYSCALE)
-    labels, _ = seg.segment_nuclei_watershed(h_img)
+    # Target di addestramento della U-Net: cambia con i parametri, quindi la rete
+    # va riaddestrata e non solo ri-valutata.
+    labels, _ = seg.segment_nuclei_watershed(h_img, **WS_PARAMS)
     ws_train_masks[name] = labels
 
 # 2. Addestramento U-Net su GPU
@@ -165,7 +218,7 @@ for p in val_patches:
     # Watershed
     h_path = FASE1_DIR / cat_dir / 'h_channel' / f'{name}_hchannel.png'
     h_img = cv2.imread(str(h_path), cv2.IMREAD_GRAYSCALE)
-    ws_mask, _ = seg.segment_nuclei_watershed(h_img)
+    ws_mask, _ = seg.segment_nuclei_watershed(h_img, **WS_PARAMS)
     
     # U-Net
     rgb_path = FASE1_DIR / cat_dir / 'rgb_normalized' / f'{name}_norm.png'
@@ -175,15 +228,19 @@ for p in val_patches:
         prob = torch.sigmoid(model(img_t)).squeeze().cpu().numpy()
     prob_u8 = (prob * 255).astype(np.uint8)
     _, bin_un = cv2.threshold(prob_u8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    un_mask, _ = seg.segment_nuclei_watershed(bin_un)
+    un_mask, _ = seg.segment_nuclei_watershed(bin_un, **WS_PARAMS)
     
     ws_m = seg.compute_segmentation_metrics(gt_mask, ws_mask)
     un_m = seg.compute_segmentation_metrics(gt_mask, un_mask)
     
+    # I conteggi non sono decorativi: e' confrontando ws_n_pred con la GT che si
+    # e' scoperto che il benchmark precedente girava con parametri sbagliati.
+    # Senza queste colonne il problema sarebbe rimasto invisibile.
     results.append({
-        'image_name': name, 'category': cat,
+        'image_name': name, 'category': cat, 'gt_source': f'Cellpose_d{CALIBRATED_DIAMETER_PX}',
         'ws_dice': ws_m['dice'], 'ws_iou': ws_m['iou'], 'ws_aji': ws_m['aji'], 'ws_f1_det': ws_m['f1_det'],
-        'un_dice': un_m['dice'], 'un_iou': un_m['iou'], 'un_aji': un_m['aji'], 'un_f1_det': un_m['f1_det']
+        'un_dice': un_m['dice'], 'un_iou': un_m['iou'], 'un_aji': un_m['aji'], 'un_f1_det': un_m['f1_det'],
+        'ws_n_pred': int(ws_mask.max()), 'un_n_pred': int(un_mask.max()), 'gt_n_nuclei': int(gt_mask.max())
     })
 
 # Stampa tabella finale
@@ -211,3 +268,62 @@ with open('colab_benchmark_results.csv', 'w', newline='', encoding='utf-8') as f
     writer.writeheader()
     writer.writerows(results)
 print('\n[SUCCESS] File "colab_benchmark_results.csv" generato con successo!')
+
+# Provenienza del run. I metadati precedenti annotavano solo "Cellpose v4.x":
+# non abbastanza per rigenerare la stessa Ground Truth, e quindi per verificare
+# i numeri pubblicati. Qui si registra tutto cio' che serve a rifare il run.
+import cellpose
+
+# cellpose non espone __version__ in tutte le release (nel run del 20/08/2026 il
+# solo getattr ha registrato "sconosciuta", rendendo il run non riproducibile per
+# la ragione che questo blocco doveva prevenire). I metadati del pacchetto
+# installato sono la fonte affidabile.
+try:
+    from importlib.metadata import version as _pkg_version
+    cellpose_version = _pkg_version('cellpose')
+except Exception:
+    cellpose_version = getattr(cellpose, '__version__', 'sconosciuta')
+benchmark_metadata = {
+    'version': 'v4',
+    'step': 'Fase 2 — Benchmark GT Cellpose indipendente + U-Net ResNet-34',
+    'generated_by': 'scratch/run_colab_benchmark.py',
+    'device': str(device),
+    'versions': {
+        'cellpose_version': cellpose_version,
+        'torch': torch.__version__,
+        'opencv': cv2.__version__,
+        'numpy': np.__version__,
+    },
+    'cellpose_gt': {
+        'model_type': 'nuclei',
+        'diameter_px': CALIBRATED_DIAMETER_PX,
+        'channels': [0, 0],
+        'flow_threshold': 0.4,
+        'cellprob_threshold': 0.0,
+        'masks_dir': str(GT_DIR),
+        'n_masks_saved': len(cellpose_gt),
+    },
+    'watershed_params': WS_PARAMS,
+    'split': {
+        'seed': 42,
+        'n_train': len(train_patches),
+        'n_val': len(val_patches),
+        'val_patches': [p['name'] for p in val_patches],
+        'train_patches': [p['name'] for p in train_patches],
+    },
+    'results_mean': {
+        'watershed': {'dice': float(ws_d), 'aji': float(ws_a), 'f1_det': float(ws_f)},
+        'unet': {'dice': float(un_d), 'aji': float(un_a), 'f1_det': float(un_f)},
+    },
+    'nota': (
+        'La U-Net e\' addestrata sulle maschere watershed prodotte con '
+        'watershed_params: cambiando quei parametri cambia il suo target, quindi '
+        'il confronto vale solo fra run che li condividono.'
+    ),
+}
+with open('benchmark_metadata.json', 'w', encoding='utf-8') as f:
+    json.dump(benchmark_metadata, f, indent=2, ensure_ascii=False)
+print(f'[SUCCESS] "benchmark_metadata.json" scritto (cellpose {cellpose_version}).')
+print(f'[SUCCESS] {len(cellpose_gt)} maschere GT Cellpose salvate in "{GT_DIR}/".')
+print('\n[DA SCARICARE DA COLAB] colab_benchmark_results.csv, benchmark_metadata.json, '
+      f'{GT_DIR}/  — senza questi tre il run non e\' verificabile.')
