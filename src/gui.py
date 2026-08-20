@@ -204,8 +204,10 @@ def render_explorer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
 def render_analyzer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
     st.warning(
         "Questa sezione **non fornisce una diagnosi**: misura biomarcatori e li "
-        "confronta con le distribuzioni delle due classi. Il classificatore e' la "
-        "Fase 4 del progetto, non ancora implementata.",
+        "confronta con le distribuzioni delle due classi. Il classificatore della "
+        "Fase 4 esiste (AUC-ROC 0.94 in validazione conservativa) ma non e' "
+        "collegato a questa interfaccia: collegarlo e' una decisione successiva, "
+        "non un dettaglio tecnico.",
         icon="⚠️",
     )
     st.caption(

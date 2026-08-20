@@ -58,21 +58,24 @@ testNuovoTesi/
 │   │   ├── centroids_all.csv              # CSV Master: 94.042 nuclei con coord (x,y px/µm) e area
 │   │   ├── colab_benchmark_results.csv    # Benchmark quantitativo vs Cellpose GT
 │   │   └── segmentation_metadata.json     # Metadati completi della Fase 2
-│   └── fase3_features/                    # Matrice tabulare dei biomarcatori
-│       ├── features_patches_master.csv    # ⭐ 600 patch × 50 colonne — input della Fase 4
-│       ├── features_nuclei_all.csv        # 94.042 nuclei, morfometria per singolo nucleo
-│       ├── separability_tests.csv         # Test FL vs REACTIVE con correzione FDR
-│       └── feature_extraction_metadata.json  # Parametri e ambiente (riproducibilità)
+│   ├── fase3_features/                    # Matrice tabulare dei biomarcatori
+│   │   ├── features_patches_master.csv    # ⭐ 600 patch × 50 colonne — input della Fase 4
+│   │   ├── features_nuclei_all.csv        # 94.042 nuclei, morfometria per singolo nucleo
+│   │   ├── separability_tests.csv         # Test FL vs REACTIVE con correzione FDR
+│   │   └── feature_extraction_metadata.json  # Parametri e ambiente (riproducibilità)
+│   └── fase4_classification/              # Metriche, modello serializzato e importanze SHAP
 │
 ├── img/                                   # Grafici, anteprime e visualizzazioni visive
 │   ├── fase1/                             # Preview normalizzazione e separazione croma
 │   ├── fase2/                             # Preview segmentazione, overlay contorni e loss
-│   └── fase3/                             # Boxplot, heatmap correlazione, distribuzioni k-NN
+│   ├── fase3/                             # Boxplot, heatmap correlazione, distribuzioni k-NN
+│   └── fase4/                             # Curve ROC, forbice di validazione, riepilogo SHAP
 │
 ├── reports/                               # Report scientifici dettagliati in Markdown
 │   ├── fase1_report.md                    # Preprocessing e derivazione della scala spaziale
 │   ├── fase2_report.md                    # Metriche AJI/F1 e Benchmark Segmentazione
 │   ├── fase3_report.md                    # Biomarcatori, separabilità statistica e figure
+│   ├── fase4_report.md                    # Classificazione, forbice di validazione e SHAP
 │   └── fase3_implementation_plan.md       # Piano operativo, decisioni D1–D7, stato dei task
 │
 ├── src/                                   # Codice sorgente modulare Python
@@ -83,11 +86,11 @@ testNuovoTesi/
 │   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   ├── feature_analysis.py                # Test di separabilità FL vs REACTIVE e figure
-│   ├── 04_classification.py               # Machine Learning Tabulare & XAI (SHAP) — da implementare
+│   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione e SHAP
 │   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
 │   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
 │
-├── tests/                                 # Test automatici (pytest) — 151 test
+├── tests/                                 # Test automatici (pytest) — 183 test
 │   ├── test_calibration.py                # Calibrazione e assenza di duplicazioni
 │   ├── test_naming.py                     # Convenzioni di naming e categorie
 │   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
@@ -100,6 +103,7 @@ testNuovoTesi/
 │   ├── test_segmentation_split.py         # Split stratificato train/val
 │   ├── test_gui_core.py                   # Coerenza GUI ↔ pipeline sui biomarcatori
 │   ├── test_gui.py                        # Interfaccia Streamlit headless (AppTest)
+│   ├── test_classification.py             # Fase 4: blocchi, riduzione ridondanze, SHAP
 │   └── test_segmentation_reproducibility.py  # I default rigenerano le maschere del dataset
 │
 ├── Biblioteca personale.txt               # Riferimenti bibliografici accademici
@@ -143,6 +147,23 @@ testNuovoTesi/
 - **Non discriminanti:** l'intera famiglia della solidità e della circolarità — a questa scala le due popolazioni nucleari sono ugualmente compatte.
 - **Nota metodologica:** durante questa fase è emersa ed è stata corretta un'assunzione errata sulla **calibrazione spaziale** (da 0.23 a 0.46 µm/px); la derivazione del valore corretto è documentata in [`reports/fase1_report.md`](reports/fase1_report.md).
 
+### Fase 4: Classificazione Tabulare e Spiegabilità Clinica
+
+- **Biomarcatori usati:** **33 dei 47**, ottenuti raggruppando le variabili quasi identiche ($|\rho| > 0.90$) e tenendo di ogni gruppo la più leggibile clinicamente. La riduzione serve alla spiegabilità: fra due variabili ridondanti SHAP divide il merito arbitrariamente e le fa apparire entrambe meno importanti di quanto sono.
+- **Doppia validazione.** Le 600 patch provengono da ~221 casi, con più patch per caso, ma il dataset pubblicato non contiene identificativi di paziente. Ogni modello è quindi valutato due volte: con split casuale (ottimistico) e con split a blocchi contigui che tengono unite le patch vicine (conservativo). **Quel che si pubblica è la forbice fra i due.**
+
+  | Modello | Split casuale | **Blocchi (conservativo)** | Forbice |
+  |---|:---:|:---:|:---:|
+  | Regressione logistica | $0.9181$ | $0.8992$ | $+0.019$ |
+  | Random Forest | $0.9602$ | $0.9361$ | $+0.024$ |
+  | **XGBoost** | $0.9648$ | $\mathbf{0.9401\ [0.9057,\ 0.9744]}$ | $+0.025$ |
+
+- **Il leakage valeva circa due punti di AUC**, misurati anziché stimati a occhio. Il degrado è monotono al crescere del blocco (XGBoost: $0.960 \rightarrow 0.935$ da blocchi di 5 a 30), il che conferma che la dipendenza dal vicinato è reale.
+- **Complessità e interpretabilità:** Random Forest e XGBoost sono statisticamente indistinguibili ($p = 1.000$), e una regressione logistica arriva a $0.899$. Gran parte del segnale è lineare: il valore della fase non sta nel punteggio ma nel dire *quali* biomarcatori decidono.
+- **Biomarcatore dominante:** `lbp_entropy` (importanza SHAP $3.15$, il doppio del secondo), primo anche nei test univariati della Fase 3.
+- **Scoperta multivariata:** `solidity_mean` è terza per SHAP ma trentanovesima in Fase 3. Le medie di classe sono quasi identiche ($p = 0.106$) ma le **dispersioni** no (Levene $p = 3.0 \times 10^{-6}$): nel linfoma la solidità nucleare è più eterogenea, e valori estremi in entrambe le direzioni indicano FL. Un effetto di dispersione che il confronto fra medie non poteva rilevare — il **pleomorfismo nucleare**.
+- **Gli errori non sono sparsi:** 28 blocchi su 60 non sbagliano nulla, 4 sbagliano più della metà. Il modello fallisce su pochi casi difficili, e su quelli fallisce quasi sempre.
+
 ---
 
 ## 🛠️ Requisiti e Installazione
@@ -161,6 +182,9 @@ python src/run_pipeline.py
 
 # 3. Analisi di separabilità statistica e figure della Fase 3
 python src/feature_analysis.py
+
+# 4. Classificazione tabulare e spiegabilità SHAP (Fase 4)
+python src/04_classification.py
 
 # Oppure, per eseguire solo una fase specifica:
 python src/run_pipeline.py --fase 1        # Solo Preprocessing
@@ -191,7 +215,7 @@ output da `data/`) e offre tre sezioni:
 
 > **Nessuna diagnosi.** L'interfaccia misura biomarcatori e li posiziona nelle
 > distribuzioni note; non emette una predizione FL vs REACTIVE, perché il
-> classificatore è la Fase 4, non ancora implementata.
+> classificatore della Fase 4 esiste ma non è ancora collegato all'interfaccia.
 
 La logica sta in `src/gui_core.py`, separata dai widget: chiama le stesse
 funzioni di `run_pipeline.py` invece di reimplementarle, e un test di coerenza

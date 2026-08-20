@@ -1,0 +1,117 @@
+{
+  "fase": "Fase 4 — Classificazione tabulare e spiegabilita'",
+  "spec": "docs/superpowers/specs/2026-08-20-fase4-classificazione-design.md",
+  "seed": 42,
+  "ambiente": {
+    "python": "3.14.3",
+    "scikit_learn": "1.8.0",
+    "xgboost": "3.2.0",
+    "numpy": "2.4.3"
+  },
+  "riduzione_ridondanze": {
+    "soglia_rho": 0.9,
+    "n_biomarcatori_iniziali": 47,
+    "n_biomarcatori_tenuti": 33,
+    "tenuti": [
+      "n_nuclei",
+      "nuclear_area_fraction",
+      "area_top10_mean_um2",
+      "area_um2_mean",
+      "area_um2_skew",
+      "area_um2_cv",
+      "perimeter_um_mean",
+      "perimeter_um_std",
+      "perimeter_um_skew",
+      "perimeter_um_cv",
+      "circularity_mean",
+      "circularity_std",
+      "eccentricity_mean",
+      "eccentricity_std",
+      "eccentricity_skew",
+      "solidity_mean",
+      "solidity_std",
+      "solidity_skew",
+      "major_axis_um_std",
+      "major_axis_um_skew",
+      "major_axis_um_cv",
+      "minor_axis_um_std",
+      "minor_axis_um_skew",
+      "minor_axis_um_cv",
+      "aspect_ratio_std",
+      "aspect_ratio_skew",
+      "knn1_dist_mean_um",
+      "knn1_dist_std_um",
+      "glcm_contrast",
+      "glcm_homogeneity",
+      "lbp_entropy",
+      "hchannel_mean",
+      "hchannel_std"
+    ]
+  },
+  "validazione": {
+    "n_splits": 5,
+    "block_size_principale": 10,
+    "block_sizes_sensibilita": [
+      5,
+      10,
+      20,
+      30
+    ],
+    "n_blocchi_principale": 60
+  },
+  "griglie": {
+    "logistic_regression": {
+      "model__C": [
+        0.01,
+        0.1,
+        1.0,
+        10.0
+      ]
+    },
+    "random_forest": {
+      "model__n_estimators": [
+        300
+      ],
+      "model__max_depth": [
+        null,
+        6
+      ],
+      "model__min_samples_leaf": [
+        1,
+        5
+      ]
+    },
+    "xgboost": {
+      "model__n_estimators": [
+        300
+      ],
+      "model__max_depth": [
+        3,
+        6
+      ],
+      "model__learning_rate": [
+        0.05,
+        0.2
+      ]
+    }
+  },
+  "auc_roc_medio": {
+    "logistic_regression": {
+      "A_casuale": 0.9181111111111111,
+      "B_blocchi": 0.8991666666666666,
+      "forbice": 0.01894444444444454
+    },
+    "random_forest": {
+      "A_casuale": 0.9601666666666666,
+      "B_blocchi": 0.9361388888888887,
+      "forbice": 0.02402777777777787
+    },
+    "xgboost": {
+      "A_casuale": 0.9647777777777777,
+      "B_blocchi": 0.9400555555555554,
+      "forbice": 0.024722222222222312
+    }
+  },
+  "modello_migliore": "xgboost",
+  "nota": "Il modello migliore e' scelto sulla validazione B (conservativa): sceglierlo su A premierebbe chi sfrutta meglio il leakage."
+}
