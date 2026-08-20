@@ -35,6 +35,10 @@ torchvision==0.28.0
 xgboost==3.2.0
 shap==0.51.0
 
+# === Interfaccia grafica ===
+# Avvio: streamlit run src/gui.py
+streamlit==1.55.0
+
 # === Utility ===
 tqdm==4.67.3
 joblib==1.5.3
