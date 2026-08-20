@@ -1,7 +1,7 @@
 # Report Fase 3 — Estrazione Biomarcatori Citomorfometrici, Spaziali e di Tessitura
 ### Tesi: Quantificazione Citomorfometrica e Spaziale per la Classificazione tra Linfoma Follicolare e Tessuto Reattivo
 *Modulo: src/03_feature_extraction.py*
-*Aggiornato: 19 agosto 2026 — Corretta discrepanza nel conteggio delle feature (vedi nota in Sezione 2)*
+*Aggiornato: 20 agosto 2026 — Estrazione eseguita sulle 600 patch (Sezione 3.1). Revisione della calibrazione spaziale (Sezione 3.4) e correzione del conteggio delle feature (nota in Sezione 2).*
 
 > **Piano operativo:** `reports/fase3_implementation_plan.md` — stato di avanzamento,
 > decisioni metodologiche approvate (D1–D7) e task di implementazione.
@@ -17,6 +17,7 @@ Output:
 - data/fase3_features/features_nuclei_all.csv
 - data/fase3_features/features_patches_master.csv — 600 righe x 50 colonne (47 feature + 3 metadati)
 - data/fase3_features/feature_extraction_metadata.json
+- data/fase3_features/separability_tests.csv — test di separabilita sulle 47 feature
 - img/fase3/morphometry_regions_preview.png
 
 ---
@@ -154,23 +155,170 @@ Le due statistiche di intensita restano calcolabili, non richiedendo adiacenza.
 
 ## 3. Risultati dell-Estrazione - Statistiche Descrittive
 
-[Sezione da completare dopo esecuzione di: python src/run_pipeline.py --fase 3]
+Sezione 3.1: integrita dell'estrazione. Sezione 3.2: confronto descrittivo fra le classi.
+Sezione 3.3: test di separabilita con correzione per test multipli. Sezione 3.4: revisione
+della calibrazione spaziale emersa durante questa fase.
 
 ### 3.1 Overview del Dataset Estratto
+
+Esecuzione del 20 agosto 2026 (`python src/run_pipeline.py --fase 3`).
+
 | Metrica | Valore |
 |---|---|
-| Patch processate | — / 600 |
-| Nuclei elaborati | — / 94.042 |
-| Feature estratte per patch | 47 (+ 3 metadati) |
-| Valori NaN | — |
-| Errori di processamento | — |
-| Tempo di esecuzione | — s |
+| Patch processate | **600 / 600** (0 errori) |
+| Nuclei elaborati | **94.042 / 94.042** |
+| Feature estratte per patch | 47 (+ 3 metadati) = 50 colonne |
+| Valori NaN | **0** su 28.200 valori |
+| Colonne a varianza nulla | 0 |
+| Tempo di esecuzione | 183,8 s (0,31 s/patch) |
+
+Controlli di integrita superati: intestazione del CSV conforme al contratto delle 50
+colonne, 300 patch per classe, `target` coerente con `category`, numero di nuclei
+identico a quello di `centroids_all.csv` della Fase 2, e somma di `n_nuclei` sulle
+600 patch pari alle righe del CSV per nucleo.
+
+**Nessun valore NaN.** Le decisioni D1 (k-NN non definite) e D2 (tessitura su maschera
+vuota) prevedono `NaN` sui casi degeneri, ma su questo dataset non se ne presenta
+nessuno: la patch piu povera contiene **66 nuclei** (mediana 158, massimo 227), ben
+oltre i 4 richiesti da k=3. Le guardie restano necessarie per robustezza, ma non hanno
+effetto su questi dati — e questo va detto, perche significa che la Fase 4 non deve
+gestire alcuna imputazione.
 
 ### 3.2 Statistiche Descrittive FL vs REACTIVE
-[Tabella da generare dopo esecuzione]
+
+Estratto delle medie per classe. La tabella completa sulle 47 feature, con test di
+significativita ed effect size, e prodotta nella Sezione 3.3.
+
+| Biomarcatore | FL | REACTIVE | Direzione |
+|---|---|---|---|
+| `n_nuclei` | 149,2 | 164,3 | REACTIVE piu popolato |
+| `nuclear_density_per_1000um2` | 14,05 | 15,48 | REACTIVE piu denso |
+| `nuclear_area_fraction` | 0,304 | 0,355 | REACTIVE piu occupato |
+| `area_um2_mean` | 21,44 | 23,00 | nuclei piu piccoli in FL |
+| `area_top10_mean_um2` | 44,22 | 46,51 | Iwamoto et al. (2024) |
+| `major_axis_um_mean` | 6,71 | 6,88 | — |
+| `circularity_mean` | 0,769 | 0,768 | sovrapposte |
+| `eccentricity_mean` | 0,710 | 0,690 | nuclei piu allungati in FL |
+| `solidity_mean` | 0,863 | 0,871 | — |
+| `knn1_dist_mean_um` | 6,09 | 5,94 | packing piu lasso in FL |
+| `knn3_dist_mean_um` | 7,50 | 7,20 | packing piu lasso in FL |
+| `glcm_contrast` | 46,54 | 49,83 | cromatina piu uniforme in FL |
+| `glcm_homogeneity` | 0,258 | 0,239 | cromatina piu uniforme in FL |
+| `lbp_entropy` | 2,82 | 3,02 | micro-tessitura piu semplice in FL |
+| `hchannel_mean` | 162,5 | 172,7 | — |
+
+Il quadro e coerente su tre fronti indipendenti: il linfoma follicolare presenta nuclei
+mediamente **piu piccoli e piu allungati**, un **packing meno fitto** (meno nuclei, minore
+densita e frazione di area, distanze inter-nucleari maggiori) e una **cromatina piu
+uniforme** (minor contrasto, maggiore omogeneita, minore entropia LBP). La circolarita
+media e invece praticamente identica fra le due classi: un candidato a essere scartato
+in Fase 4.
+
+Si noti che `eccentricity` e `circularity` sono adimensionali e quindi **non risentono
+della revisione della calibrazione** documentata nella Sezione 3.4.
 
 ### 3.3 Test Statistici di Separabilita (t-test / Mann-Whitney U)
-[Tabella con p-value per ogni feature da generare dopo esecuzione]
+
+Prodotti da `src/feature_analysis.py`; tabella completa in
+`data/fase3_features/separability_tests.csv`.
+
+**Metodo.** Il test non e fissato a priori: per ogni feature si verifica la normalita
+dei due gruppi con Shapiro-Wilk e si usa il t-test di Welch se entrambi la soddisfano,
+Mann-Whitney U altrimenti. Molte feature morfometriche sono asimmetriche per costruzione,
+quindi imporre ovunque il t-test sarebbe scorretto. I p-value sono corretti per test
+multipli con Benjamini-Hochberg (decisione D4) e la significativita e decisa sul valore
+corretto. L'effect size e sempre riportato, con segno positivo quando il valore e
+maggiore nel linfoma follicolare.
+
+**Esito complessivo: 37 feature su 47 risultano significative (FDR < 0.05).**
+
+#### Le 12 feature con l'evidenza piu forte
+
+| Feature | Test | p grezzo | p FDR | Effect size | Direzione |
+|---|---|---|---|---|---|
+| `lbp_entropy` | Mann-Whitney | 6,8e-53 | **3,2e-51** | **-0,722** | micro-tessitura piu semplice in FL |
+| `hchannel_mean` | Mann-Whitney | 8,4e-19 | 2,0e-17 | -0,418 | ematossilina meno intensa in FL |
+| `nuclear_area_fraction` | Mann-Whitney | 2,5e-16 | 4,0e-15 | -0,387 | meno area occupata in FL |
+| `knn3_dist_mean_um` | Mann-Whitney | 2,6e-14 | 3,1e-13 | +0,359 | packing piu lasso in FL |
+| `n_nuclei` | Mann-Whitney | 6,6e-14 | 5,2e-13 | -0,354 | meno nuclei in FL |
+| `nuclear_density_per_1000um2` | Mann-Whitney | 6,6e-14 | 5,2e-13 | -0,354 | *(collineare con n_nuclei)* |
+| `glcm_homogeneity` | Mann-Whitney | 1,5e-13 | 9,8e-13 | +0,349 | cromatina piu uniforme in FL |
+| `minor_axis_um_mean` | Mann-Whitney | 2,9e-11 | 1,7e-10 | -0,314 | nuclei piu stretti in FL |
+| `eccentricity_mean` | Mann-Whitney | 3,2e-11 | 1,7e-10 | +0,313 | nuclei piu allungati in FL |
+| `knn1_dist_mean_um` | Mann-Whitney | 4,9e-11 | 2,3e-10 | +0,310 | packing piu lasso in FL |
+| `knn1_dist_std_um` | Mann-Whitney | 7,1e-11 | 3,0e-10 | +0,308 | packing piu irregolare in FL |
+| `eccentricity_cv` | Welch t | 7,2e-10 | 2,4e-09 | -0,512 | allungamento piu omogeneo in FL |
+
+#### Le 10 feature non significative
+
+`area_um2_std`, `solidity_mean`, `major_axis_um_std`, `aspect_ratio_skew`,
+`major_axis_um_cv`, `solidity_cv`, `solidity_std`, `circularity_skew`,
+`circularity_mean`, `perimeter_um_cv`.
+
+Il dato saliente e che **l'intera famiglia della solidita e quella della circolarita non
+discriminano**: `solidity_mean`, `_std` e `_cv` sono tutte non significative, e
+`circularity_mean` ha p = 0,59. Sono descrittori di *compattezza* della forma, e a questa
+scala le due popolazioni nucleari sono ugualmente compatte. Cio che le separa e altro:
+la **tessitura cromatinica**, il **packing spaziale** e l'**allungamento**.
+
+#### Quattro osservazioni metodologiche
+
+**1. La tessitura domina, e non era scontato.**
+`lbp_entropy` ha un p-value corretto di 3,2e-51, trenta ordini di grandezza sotto la
+seconda feature, e un effect size rango-biseriale di -0,72 (grande). La complessita della
+micro-tessitura cromatinica e il singolo biomarcatore piu discriminante dell'intero set —
+piu di qualunque descrittore di forma o dimensione. Questo giustifica a posteriori la
+decisione D2 di calcolarla sui soli pixel nucleari: e proprio il segnale che il
+mascheramento serviva a isolare.
+
+**2. La scelta del test sui dati era necessaria.**
+45 feature su 47 hanno richiesto Mann-Whitney: solo `eccentricity_cv` ed
+`eccentricity_std` superano il test di normalita in entrambi i gruppi. Imporre il t-test di Welch
+a priori, come e prassi in molti lavori, avrebbe applicato un test parametrico a
+distribuzioni che nella quasi totalita dei casi non lo consentono.
+
+**3. La correzione FDR non ha cambiato alcun verdetto — e va detto.**
+Nessuna feature passa da significativa a non significativa applicando Benjamini-Hochberg.
+Il motivo e che i p-value sono nettamente bipartiti: o astronomicamente piccoli (fino a
+1e-51) o chiaramente sopra soglia (il piu basso fra i non significativi e 0,057). Non
+c'e alcuna feature nella zona grigia dove la correzione fa la differenza. La correzione
+resta metodologicamente doverosa — senza applicarla non si potrebbe sapere che non
+serviva — ma per onesta va riportato che in questo dataset non ha alterato le
+conclusioni.
+
+**4. Gli effect size non sono confrontabili fra loro.**
+La tabella mescola due scale diverse: la correlazione rango-biseriale (Mann-Whitney,
+intervallo [-1, 1]) e la d di Cohen (Welch, non limitata). Un valore di -0,72
+rango-biseriale indica un effetto grande, mentre -0,51 di d di Cohen indica un effetto
+medio: i due numeri **non vanno confrontati direttamente**, e nella tesi la colonna
+`effect_size_type` del CSV va sempre riportata accanto al valore.
+
+#### Collinearita: avvertenza per la Fase 4
+
+`n_nuclei` e `nuclear_density_per_1000um2` hanno p-value ed effect size **identici** —
+non e una coincidenza: la densita e il conteggio diviso per l'area della patch, che e
+costante. La correlazione di Spearman fra le due e **1,0000**: sono la stessa variabile
+espressa in due unita, e in Fase 4 una delle due va eliminata.
+
+L'analisi di correlazione sull'intera matrice individua **9 coppie con |rho| > 0,95**:
+
+| rho | Coppia |
+|---|---|
+| 1,0000 | `n_nuclei` ~ `nuclear_density_per_1000um2` |
+| 0,9968 | `solidity_std` ~ `solidity_cv` |
+| 0,9734 | `area_um2_mean` ~ `minor_axis_um_mean` |
+| 0,9713 | `perimeter_um_mean` ~ `major_axis_um_mean` |
+| 0,9699 | `aspect_ratio_std` ~ `aspect_ratio_cv` |
+| 0,9597 | `area_top10_mean_um2` ~ `area_um2_std` |
+| 0,9513 | `eccentricity_mean` ~ `aspect_ratio_mean` |
+| 0,9504 | `n_nuclei` ~ `knn3_dist_mean_um` |
+| 0,9504 | `nuclear_density_per_1000um2` ~ `knn3_dist_mean_um` |
+
+Alcune sono attese e innocue per i modelli ad albero (che tollerano la collinearita), ma
+**distorcono l'interpretazione SHAP**: fra due feature quasi identiche l'importanza viene
+divisa arbitrariamente, sottostimando entrambe. Poiche la spiegabilita clinica e
+l'obiettivo dichiarato della tesi, la riduzione di queste ridondanze va affrontata
+esplicitamente in Fase 4.
 
 ### 3.4 Verifica di Sanita Dimensionale — ANOMALIA RISOLTA (calibrazione corretta)
 
@@ -300,8 +448,29 @@ monotone delle feature.
 
 Cio che invaliderebbe e l'**interpretazione clinica assoluta** e il confronto diretto
 con le soglie dimensionali di Iwamoto et al. (2024) — cioe proprio uno dei punti di forza
-dichiarati dell'approccio white-box in unita fisiche reali. Per questo la verifica va
-fatta prima di consegnare, ma non blocca l'esecuzione della Fase 3.
+dichiarati dell'approccio white-box in unita fisiche reali.
+
+#### Esito: correzione applicata
+
+La calibrazione e stata portata a 0.46 um/px in tutto il progetto (codice, dati derivati
+e documentazione) e l'estrazione della Fase 3 e stata eseguita con il nuovo valore. I
+biomarcatori risultanti sono ora compatibili con la letteratura:
+
+| Grandezza | Prima (0.23 um/px) | Dopo (0.46 um/px) | Atteso |
+|---|---|---|---|
+| Diametro nucleare equivalente medio | 2,48 um | **5,32 um** | 6-12 um (misura non corretta per la sotto-copertura) |
+| Diametro corretto per Dice 0,637 | 3,11 um | **6,67 um** | 6-12 um |
+| Densita nucleare (FL / REACTIVE) | ~58.000 /mm2 | **14.049 / 15.476 /mm2** | 10.000-20.000 /mm2 |
+| Lato del campo visivo | 51,5 um | **103,0 um** | — |
+| Frazione di area nucleare | 0,313 | 0,313 (invariata) | fisiologica |
+
+Il diametro corretto per la sotto-copertura del Watershed (6,67 um) e la densita nucleare
+di entrambe le classi cadono ora dentro gli intervalli di letteratura, mentre con la
+calibrazione precedente erano rispettivamente troppo piccolo e fisicamente impossibile.
+La frazione di area nucleare, che non dipende dalla calibrazione, e ovviamente invariata:
+serve da controllo che la correzione non abbia alterato i dati sottostanti.
+
+Resta valida l'avvertenza: il valore e dedotto, non pubblicato dagli autori.
 
 
 #### Stato: revisione applicata il 19 agosto 2026
@@ -332,9 +501,72 @@ e influenzata dalla calibrazione.
 
 ---
 
-## 4. Anteprime Grafiche
+## 4. Figure
 
-[Immagini da inserire dopo esecuzione]
+Tutte a 300 dpi, generate da `src/feature_analysis.py` (le prime tre) e da
+`src/run_pipeline.py --fase 3` (l'anteprima citomorfometrica). Codice colore comune:
+**rosso = linfoma follicolare**, **blu = tessuto reattivo**.
+
+### 4.1 Regioni considerate dalla citomorfometria
+
+![Anteprima citomorfometrica](../img/fase3/morphometry_regions_preview.png)
+
+`img/fase3/morphometry_regions_preview.png` — confronto FL vs REACTIVE fra RGB
+normalizzata e maschere d'istanza, con bounding box, contorni nucleari e centroidi.
+Mostra visivamente su cosa vengono calcolati i biomarcatori: e la verifica qualitativa
+che la segmentazione della Fase 2 stia isolando nuclei e non artefatti.
+
+### 4.2 Biomarcatori piu discriminanti
+
+![Boxplot delle feature piu discriminanti](../img/fase3/boxplot_top_features.png)
+
+`img/fase3/boxplot_top_features.png` — boxplot affiancati per le sei feature con
+l'evidenza statistica piu forte, ciascuna con il proprio p-value corretto FDR.
+
+La separazione di `lbp_entropy` e visibile a occhio: le due scatole sono quasi disgiunte,
+il che spiega il p-value di 3,2e-51. Le altre cinque mostrano distribuzioni parzialmente
+sovrapposte con mediane nettamente diverse — significative ma non separabili da sole, il
+che e esattamente la ragione per cui serve un modello multivariato in Fase 4.
+
+**Nota di lettura:** il quinto e il sesto pannello (`n_nuclei` e
+`nuclear_density_per_1000um2`) hanno forma identica perche sono la stessa variabile
+espressa in due unita (vedi Sezione 3.3). La duplicazione non e stata rimossa perche
+rende visivamente evidente la collinearita perfetta discussa piu sopra.
+
+### 4.3 Distribuzione delle distanze inter-nucleari
+
+![Distribuzioni k-NN](../img/fase3/knn_distribution.png)
+
+`img/fase3/knn_distribution.png` — istogrammi sovrapposti dei quattro descrittori k-NN,
+con la media di classe come linea tratteggiata.
+
+E il risultato micro-spaziale caratteristico di questo lavoro, quello che sostituisce i
+grafi di Delaunay e MST esclusi per la scala della patch (Sezione 1.1). Le distribuzioni
+FL sono spostate verso destra in tutti e quattro i pannelli: nel linfoma follicolare i
+nuclei sono **piu distanti fra loro e disposti in modo piu irregolare**. Lo spostamento
+delle medie e dell'ordine di 0,15-0,30 um, piccolo in assoluto ma sistematico su 300
+patch per classe.
+
+### 4.4 Correlazione fra i biomarcatori
+
+![Heatmap di correlazione](../img/fase3/correlation_heatmap.png)
+
+`img/fase3/correlation_heatmap.png` — matrice di correlazione di Spearman fra tutte le
+47 feature.
+
+La struttura a blocchi lungo la diagonale rende immediata la ridondanza del set:
+
+- un blocco **dimensionale** (`area_*`, `perimeter_*`, `major_axis_*`, `minor_axis_*`,
+  `area_top10_*`) fortemente correlato al proprio interno;
+- un blocco **micro-spaziale** (le quattro k-NN), coeso e anticorrelato con `n_nuclei` e
+  `nuclear_density_per_1000um2` — piu nuclei, meno spazio fra loro;
+- un blocco **di tessitura** (`glcm_*`, `lbp_entropy`, `hchannel_*`), in cui contrasto e
+  omogeneita sono fortemente anticorrelati come atteso da Haralick;
+- le famiglie di **forma** (`circularity_*`, `solidity_*`, `eccentricity_*`), piu
+  indipendenti dalle altre ma anche, come visto nella Sezione 3.3, le meno discriminanti.
+
+La figura serve alla Fase 4: e la mappa delle ridondanze da ridurre prima di interpretare
+i valori SHAP.
 
 ---
 
@@ -351,6 +583,9 @@ e influenzata dalla calibrazione.
 | skimage.feature.graycomatrix / graycoprops | GLCM e proprieta di Haralick |
 | skimage.feature.local_binary_pattern | LBP per l'entropia di micro-tessitura |
 | opencv-python | Lettura di maschere 16-bit e H-channel |
+| pandas | Analisi statistica e statistiche descrittive per classe (Sezione 3.2-3.3) |
+| scipy.stats.shapiro / ttest_ind / mannwhitneyu | Test di normalita e di separabilita |
+| scipy.stats.false_discovery_control | Correzione Benjamini-Hochberg (D4) |
 
 ### 5.2 File dei metadati
 
@@ -412,6 +647,31 @@ versioni, produce byte identici.
 ---
 
 ## 7. Sviluppi Futuri: Graph Neural Networks su Whole Slide Images
+
+### Divergenza consapevole rispetto alla proposta di tesi approvata
+
+La proposta di tesi approvata richiede esplicitamente, al punto 4 del workflow
+metodologico, quattro elementi che **non compaiono nel set definitivo** di questo lavoro:
+
+| Richiesto dalla proposta | Stato | Motivazione |
+|---|---|---|
+| Triangolazione di Delaunay | escluso | boundary effects sulla micro-patch (sotto) |
+| Minimum Spanning Tree | escluso | stessa ragione; inoltre quasi equivalente a k-NN |
+| k-NN con **k = 5** | escluso | ridondante con k = 3 alla scala del campo visivo |
+| Momenti cromatici CIE-LAB | escluso | ridondanti dopo la normalizzazione di Macenko |
+
+Si tratta di una **scelta metodologica consapevole e motivata, non di un'omissione**, e
+come tale va dichiarata in sede di discussione. Le distanze k-NN (Sezione 2.5)
+sostituiscono Delaunay e MST come descrittori di micro-architettura del packing nucleare,
+e i risultati della Sezione 3.3 mostrano che tre dei quattro descrittori k-NN sono fra i
+biomarcatori piu discriminanti dell'intero set.
+
+**Verifica empirica rinviata.** L'argomento a sostegno dell'esclusione e teorico
+(scala del campo visivo e ridondanza matematica). Una conferma piu forte consisterebbe
+nel calcolare comunque queste feature e mostrarne numericamente la correlazione con le
+k-NN e il potere discriminante nullo o marginale. E una verifica a basso costo,
+rimandata per priorita e non per difficolta, e costituisce il primo naturale
+ampliamento del lavoro.
 
 ### Perche Delaunay e MST non sono stati usati in questo lavoro
 

@@ -2,8 +2,10 @@
 
 > **Stato: IN ESECUZIONE.**
 > Decisioni D1–D7 (Sezione 2) approvate il 19 agosto 2026.
-> **Task 1–4 completati** (k-NN, tessitura, cablaggio e contratto, metadati FAIR).
-> Prossimo: Task 5 — esecuzione sulle 600 patch.
+> **FASE 3 COMPLETATA.** Tutti gli otto task chiusi il 20 agosto 2026.
+> 600 patch × 50 colonne da 94.042 nuclei, 0 errori, 0 NaN; **37 feature su 47
+> significative** (FDR < 0.05); quattro figure a 300 dpi; 117 test verdi.
+> Criteri di completamento verificati in Sezione 5.
 > Durante il Task 1 è emersa ed è stata risolta la revisione della calibrazione spaziale (Sezione 4bis).
 
 **Obiettivo:** completare l'estrazione dei 47 biomarcatori citomorfometrici, micro-spaziali e di tessitura dalle 600 patch, eseguirla sull'intero dataset e quantificare la separabilità statistica FL vs REACTIVE.
@@ -29,8 +31,10 @@
 | `03_feature_extraction.py` STEP 4 — tessitura | ✅ implementato (Task 2) |
 | `run_fase3` — cablaggio STEP 3/4 | ✅ fatto (Task 3) |
 | `run_fase3` — metadata JSON | ✅ fatto (Task 4) |
-| `data/fase3_features/` | ❌ mai generata |
-| `reports/fase3_report.md` §3 (risultati) e §4 (figure) | ❌ vuote |
+| `data/fase3_features/` | ✅ generata (Task 5) |
+| `reports/fase3_report.md` §3.1–3.2 | ✅ compilate | 
+| `reports/fase3_report.md` §3.3 (test di separabilità) | ✅ compilata (Task 6) |
+| `reports/fase3_report.md` §4 (figure) | ✅ compilata (Task 7–8) |
 | Feature attualmente prodotte | 47 / 47, cablate e verificate dal contratto |
 
 **Prerequisiti già chiusi** (audit di apertura Fase 3, sezione di fix completata il 19 agosto 2026):
@@ -877,10 +881,10 @@ Due controlli indipendenti convergono su 0.46 µm/px: la densità nucleare diven
 
 La Fase 3 è chiusa quando tutte queste condizioni sono vere contemporaneamente:
 
-- [ ] `features_patches_master.csv` esiste con 600 righe × 50 colonne
-- [ ] `features_nuclei_all.csv` è coerente con `centroids_all.csv` sul numero di nuclei
-- [ ] `feature_extraction_metadata.json` documenta tutti i parametri di D1, D2, D3
-- [ ] `separability_tests.csv` riporta p-value grezzi e corretti FDR per tutte le 47 feature
-- [ ] `python -m pytest tests/ -q` interamente verde
-- [ ] `reports/fase3_report.md` non contiene più segnaposto
-- [ ] La divergenza D7 dalla proposta approvata è documentata in forma citabile nella tesi
+- [x] `features_patches_master.csv` esiste con 600 righe × 50 colonne
+- [x] `features_nuclei_all.csv` è coerente con `centroids_all.csv` sul numero di nuclei (94.042)
+- [x] `feature_extraction_metadata.json` documenta tutti i parametri di D1, D2, D3
+- [x] `separability_tests.csv` riporta p-value grezzi e corretti FDR per tutte le 47 feature
+- [x] `python -m pytest tests/ -q` interamente verde (117 test)
+- [x] `reports/fase3_report.md` non contiene più segnaposto
+- [x] La divergenza D7 dalla proposta approvata è documentata in forma citabile (§7)
