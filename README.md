@@ -63,13 +63,13 @@ testNuovoTesi/
 │   │   ├── features_nuclei_all.csv        # 94.042 nuclei, morfometria per singolo nucleo
 │   │   ├── separability_tests.csv         # Test FL vs REACTIVE con correzione FDR
 │   │   └── feature_extraction_metadata.json  # Parametri e ambiente (riproducibilità)
-│   └── fase4_classification/              # Metriche, modello serializzato e importanze SHAP
+│   └── fase4_classification/              # Metriche, modello, SHAP, ablazione e robustezza
 │
 ├── img/                                   # Grafici, anteprime e visualizzazioni visive
 │   ├── fase1/                             # Preview normalizzazione e separazione croma
 │   ├── fase2/                             # Preview segmentazione, overlay contorni e loss
 │   ├── fase3/                             # Boxplot, heatmap correlazione, distribuzioni k-NN
-│   └── fase4/                             # Curve ROC, forbice di validazione, riepilogo SHAP
+│   └── fase4/                             # ROC, forbice, SHAP, robustezza alla colorazione
 │
 ├── reports/                               # Report scientifici dettagliati in Markdown
 │   ├── fase1_report.md                    # Preprocessing e derivazione della scala spaziale
@@ -86,11 +86,12 @@ testNuovoTesi/
 │   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   ├── feature_analysis.py                # Test di separabilità FL vs REACTIVE e figure
-│   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione e SHAP
+│   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione, SHAP, ablazione
+│   ├── stain_robustness.py                # La tessitura legge la cromatina o il vetrino?
 │   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
 │   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
 │
-├── tests/                                 # Test automatici (pytest) — 199 test
+├── tests/                                 # Test automatici (pytest) — 208 test
 │   ├── test_calibration.py                # Calibrazione e assenza di duplicazioni
 │   ├── test_naming.py                     # Convenzioni di naming e categorie
 │   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
@@ -105,6 +106,7 @@ testNuovoTesi/
 │   ├── test_gui.py                        # Interfaccia Streamlit headless (AppTest)
 │   ├── test_gui_e2e.py                    # Interfaccia con browser vero (Playwright)
 │   ├── test_classification.py             # Fase 4: blocchi, riduzione ridondanze, SHAP
+│   ├── test_stain_robustness.py           # La perturbazione altera il colore, non la geometria
 │   └── test_segmentation_reproducibility.py  # I default rigenerano le maschere del dataset
 │
 ├── Biblioteca personale.txt               # Riferimenti bibliografici accademici
@@ -164,6 +166,19 @@ testNuovoTesi/
 - **Biomarcatore dominante:** `lbp_entropy` (importanza SHAP $3.15$, il doppio del secondo), primo anche nei test univariati della Fase 3.
 - **Scoperta multivariata:** `solidity_mean` è terza per SHAP ma trentanovesima in Fase 3. Le medie di classe sono quasi identiche ($p = 0.106$) ma le **dispersioni** no (Levene $p = 3.0 \times 10^{-6}$): nel linfoma la solidità nucleare è più eterogenea, e valori estremi in entrambe le direzioni indicano FL. Un effetto di dispersione che il confronto fra medie non poteva rilevare — il **pleomorfismo nucleare**.
 - **Gli errori non sono sparsi:** 28 blocchi su 60 non sbagliano nulla, 4 sbagliano più della metà. Il modello fallisce su pochi casi difficili, e su quelli fallisce quasi sempre.
+- **Ablazione per famiglia — a decidere è la tessitura, non la morfometria.** Cinque biomarcatori di tessitura e intensità eguagliano da soli tutti e 33; i 28 morfometrici e spaziali si fermano a $0.857$.
+
+  | Sottoinsieme | n | XGBoost |
+  |---|:---:|:---:|
+  | Tutte | 33 | $0.940$ |
+  | Senza intensità (`hchannel_*`) | 31 | $0.923$ |
+  | Senza tessitura (GLCM, LBP) | 30 | $0.869$ |
+  | Solo morfometria e spaziale | 28 | $0.857$ |
+  | **Solo tessitura e intensità** | **5** | $\mathbf{0.944}$ |
+
+  Il peso sta nel **pattern della cromatina** (GLCM, LBP), non nell'intensità della colorazione: togliere `hchannel_*` costa $0.017$, togliere GLCM e LBP quattro volte tanto.
+
+- **Robustezza alla colorazione — legge la cromatina, non il vetrino.** Perturbando artificialmente la colorazione delle immagini grezze (Tellez et al., 2019) e rifacendo girare l'intera pipeline, a $\sigma = 0.2$ il modello perde mezzo punto di AUC e cambia classe su 2 patch su 100; a $\sigma = 0.3$ perde $1{,}6$ punti e il $92\%$ delle patch tiene. È la verifica che il risultato non poggia sul lotto di colorazione, e una giustificazione sperimentale a posteriori della normalizzazione di Macenko della Fase 1.
 
 ---
 
@@ -224,12 +239,15 @@ output da `data/`) e offre tre sezioni:
 | Sezione | Cosa mostra |
 |---|---|
 | **Esplora dataset** | I cinque stadi della pipeline su una patch a scelta e i 47 biomarcatori, ciascuno posizionato nella distribuzione della propria classe |
-| **Analizza immagine** | Un'immagine nuova percorre Fase 1 → 2 → 3 dal vivo e viene confrontata con entrambe le classi |
+| **Analizza immagine** | Un'immagine nuova percorre Fase 1 → 2 → 3 dal vivo, viene classificata e la decisione viene spiegata |
+| **Spiegabilità** | La forbice fra le due validazioni, quali biomarcatori decidono e in che direzione, e la spiegazione locale di un caso a scelta calcolata dal vivo |
 | **Risultati Fase 3** | Test di separabilità con correzione FDR e le figure prodotte da `feature_analysis.py` |
 
-> **Nessuna diagnosi.** L'interfaccia misura biomarcatori e li posiziona nelle
-> distribuzioni note; non emette una predizione FL vs REACTIVE, perché il
-> classificatore della Fase 4 esiste ma non è ancora collegato all'interfaccia.
+> **Non è un dispositivo diagnostico.** Il modello è addestrato su 600 patch di
+> due sole classi: è uno strumento di ricerca. Su un'immagine che non sia una
+> patch linfonodale H&E risponde comunque, con una sicurezza priva di fondamento.
+> Per le patch del dataset l'interfaccia mostra la predizione **fuori-piega**, la
+> sola onesta per un'immagine che il modello finale ha visto in addestramento.
 
 La logica sta in `src/gui_core.py`, separata dai widget: chiama le stesse
 funzioni di `run_pipeline.py` invece di reimplementarle, e un test di coerenza

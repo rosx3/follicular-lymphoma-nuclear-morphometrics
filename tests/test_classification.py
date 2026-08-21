@@ -415,3 +415,41 @@ def test_shap_declares_a_direction_only_when_the_effect_is_monotone(clf, dataset
         "entropia LBP alta indica tessuto reattivo (Fase 3, §3.2)"
     assert importance.loc["solidity_mean", "direction"] == "non monotona"
     assert set(importance["direction"]) <= {"FL", "REACTIVE", "non monotona"}
+
+
+# --------------------------------------------------------------------------
+# Ablazione per famiglia di biomarcatori
+# --------------------------------------------------------------------------
+def test_ablation_reports_every_family(clf, dataset):
+    from sklearn.model_selection import GroupKFold  # noqa: F401
+
+    subset = np.r_[0:60, 300:360]
+    names = [dataset.image_names[i] for i in subset]
+    groups = np.array(clf.contiguous_blocks(names, block_size=5))
+    models = {"logistic_regression": clf.build_models(seed=42)["logistic_regression"]}
+
+    table = clf.feature_family_ablation(
+        dataset.X[subset], dataset.y[subset], list(dataset.feature_names),
+        models, groups, seed=42, n_splits=3,
+    )
+
+    assert set(table["sottoinsieme"]) == {
+        "tutte", "senza intensita'", "senza tessitura",
+        "solo morfometria e spaziale", "solo tessitura e intensita'",
+    }
+    assert table["auc_roc_medio"].between(0.0, 1.0).all()
+
+
+def test_ablation_subsets_are_complementary(clf, dataset):
+    """
+    'solo morfometria' e 'solo tessitura' devono partizionare le feature: se si
+    sovrapponessero o lasciassero fuori qualcosa, il confronto fra famiglie non
+    direbbe cio' che sembra dire.
+    """
+    names = list(dataset.feature_names)
+    tessitura = [f for f in names if f in clf.TEXTURE_AND_INTENSITY]
+    morfometria = [f for f in names if f not in clf.TEXTURE_AND_INTENSITY]
+
+    assert set(tessitura) & set(morfometria) == set()
+    assert set(tessitura) | set(morfometria) == set(names)
+    assert len(tessitura) == 6, "le feature di tessitura e intensita' dovrebbero essere sei"
