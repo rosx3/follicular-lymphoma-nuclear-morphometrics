@@ -470,6 +470,72 @@ def evaluate(
     return (metrics, pd.concat(predictions, ignore_index=True)) if return_predictions else metrics
 
 
+# Le due famiglie di biomarcatori messe a confronto dall'ablazione. La prima
+# descrive intensita' e tessitura del segnale, la seconda la geometria dei nuclei
+# e la loro disposizione.
+TEXTURE_AND_INTENSITY = (
+    "hchannel_mean", "hchannel_std",
+    "glcm_contrast", "glcm_homogeneity", "glcm_energy", "lbp_entropy",
+)
+
+
+def feature_family_ablation(
+    X: np.ndarray,
+    y: np.ndarray,
+    feature_names: list[str],
+    models: dict[str, ModelSpec],
+    groups,
+    seed: int = 42,
+    n_splits: int = 5,
+) -> pd.DataFrame:
+    """
+    Quanto pesa ciascuna famiglia di biomarcatori sul risultato.
+
+    La tesi e' costruita sull'idea di biomarcatori morfometrici e spaziali, ma la
+    classifica SHAP mette in testa tessitura e intensita'. L'ablazione dice
+    quanto di quel risultato regge senza l'una o senza l'altra famiglia — ed e'
+    un dato che va in tesi, non una curiosita': se la morfometria da sola vale
+    molto meno del totale, la narrazione va aggiustata di conseguenza.
+
+    Si valuta sempre con lo splitter CONSERVATIVO: confrontare famiglie sulla
+    stima ottimistica premierebbe quella che sfrutta meglio il leakage.
+    """
+    from sklearn.model_selection import GroupKFold
+
+    families = {
+        "tutte": list(feature_names),
+        "senza intensita'": [f for f in feature_names
+                             if f not in ("hchannel_mean", "hchannel_std")],
+        "senza tessitura": [f for f in feature_names
+                            if f not in ("glcm_contrast", "glcm_homogeneity",
+                                         "glcm_energy", "lbp_entropy")],
+        "solo morfometria e spaziale": [f for f in feature_names
+                                        if f not in TEXTURE_AND_INTENSITY],
+        "solo tessitura e intensita'": [f for f in feature_names
+                                        if f in TEXTURE_AND_INTENSITY],
+    }
+
+    records = []
+    for label, subset in families.items():
+        if not subset:
+            continue
+        columns = [feature_names.index(f) for f in subset]
+        metrics = evaluate(
+            X[:, columns], y, models, GroupKFold(n_splits=n_splits),
+            validation=f"ablazione: {label}", seed=seed, groups=groups,
+        )
+        for model in metrics["model"].unique():
+            scores = metrics.loc[metrics.model == model, "auc_roc"]
+            records.append({
+                "sottoinsieme": label,
+                "n_biomarcatori": len(subset),
+                "model": model,
+                "auc_roc_medio": float(scores.mean()),
+                "auc_roc_std": float(scores.std(ddof=0)),
+            })
+    return pd.DataFrame(records)
+
+
 def block_size_sensitivity(
     X: np.ndarray,
     y: np.ndarray,
@@ -771,6 +837,12 @@ def main() -> None:
     predictions["image_name"] = predictions["row"].map(dict(enumerate(data.image_names)))
     predictions["block"] = predictions["row"].map(dict(enumerate(groups)))
     predictions.to_csv(OUTPUT_DIR / "out_of_fold_predictions.csv", index=False)
+
+    print("[Fase 4] Ablazione per famiglia di biomarcatori...")
+    ablation = feature_family_ablation(
+        X, data.y, reduction.kept_features, models, groups, seed=SEED, n_splits=N_SPLITS
+    )
+    ablation.to_csv(OUTPUT_DIR / "ablation_by_family.csv", index=False)
 
     print(f"[Fase 4] Sensibilita' alla dimensione del blocco {BLOCK_SIZES}...")
     sensitivity = block_size_sensitivity(

@@ -22,6 +22,13 @@ Le 600 patch sono classificate a partire da **33 biomarcatori** (ridotti dai 47 
 
 **Il numero da portare in tesi è $0.9401$**, non $0.9648$: il secondo include il vantaggio di aver visto in addestramento altre patch degli stessi vetrini.
 
+Due analisi successive precisano *da dove* viene quel risultato:
+
+| | Esito |
+|---|---|
+| **Ablazione per famiglia** (§4.4) | Cinque biomarcatori di tessitura e intensità eguagliano tutti e 33 ($0.944$); i 28 morfometrici e spaziali da soli si fermano a $0.857$. **La tessitura cromatinica porta il grosso del segnale.** |
+| **Robustezza alla colorazione** (§5) | Perturbando artificialmente la colorazione, a $\sigma=0.2$ il modello perde mezzo punto di AUC e cambia idea su 2 patch su 100. **Quelle feature leggono la cromatina, non il vetrino.** |
+
 ---
 
 ## 2. Dati e Riduzione delle Ridondanze
@@ -200,7 +207,162 @@ Tutte e cinque confermano il quadro clinico della Fase 3 su tre fronti indipende
 
 ---
 
-## 5. Conclusioni per la Tesi
+### 4.4 Ablazione: quale famiglia di biomarcatori regge davvero il risultato
+
+La classifica SHAP mette in testa `lbp_entropy` e `hchannel_mean`: **tessitura e
+intensità**, non morfometria. Ma un'importanza alta non dice quanto il risultato
+*dipenda* da quelle variabili — solo un'ablazione lo dice. Ogni sottoinsieme è
+valutato con lo splitter conservativo, perché confrontare famiglie sulla stima
+ottimistica premierebbe quella che sfrutta meglio il leakage.
+
+| Sottoinsieme | n | Regr. logistica | Random Forest | XGBoost |
+|---|:---:|:---:|:---:|:---:|
+| Tutte | 33 | 0.899 | 0.936 | **0.940** |
+| Senza intensità (`hchannel_*`) | 31 | 0.901 | 0.925 | 0.923 |
+| Senza tessitura (GLCM, LBP) | 30 | 0.785 | 0.876 | 0.869 |
+| **Solo morfometria e spaziale** | 28 | 0.766 | 0.860 | **0.857** |
+| **Solo tessitura e intensità** | 5 | 0.891 | 0.945 | **0.944** |
+
+Il risultato è netto e **coerente su tutti e tre i modelli**:
+
+**Cinque biomarcatori di tessitura e intensità eguagliano — anzi superano di un
+soffio — tutti e trentatré.** I ventotto morfometrici e spaziali non aggiungono
+nulla sopra di essi, e da soli si fermano a $0.857$ (XGBoost) o $0.766$
+(logistica). La differenza fra $0.944$ e $0.857$ è di quasi nove punti di AUC:
+non è marginale.
+
+**Ma non è l'intensità: è la tessitura.** Togliere `hchannel_mean` e
+`hchannel_std` costa appena $0.017$ ($0.940 \rightarrow 0.923$); togliere GLCM e
+LBP costa quattro volte tanto ($0.940 \rightarrow 0.869$). La grandezza che
+porta il segnale è il **pattern della cromatina**, non quanto è scura la
+colorazione — e questo è già di per sé un argomento contro l'ipotesi
+dell'artefatto tecnico, perché l'intensità media è il confondente da lotto di
+colorazione per eccellenza, ed è proprio quello che contribuisce meno.
+
+#### Cosa comporta per la narrazione della tesi
+
+Il progetto è presentato come *«paradigma white-box guidato da biomarcatori
+fisici e spaziali»*. I dati dicono che a decidere è soprattutto la **tessitura
+cromatinica**. Non è una smentita — il pattern della cromatina è un criterio
+diagnostico che i patologi usano davvero, ed è white-box quanto l'area nucleare:
+si misura, si nomina, si verifica. Ma va **nominato fra i protagonisti**, non
+lasciato in coda all'elenco delle famiglie.
+
+La morfometria non diventa inutile: da sola raggiunge $0.857$, che è un risultato
+rispettabile, e resta la parte più direttamente leggibile da un clinico. La
+formulazione corretta è che *le due famiglie raggiungono prestazioni diverse, e
+la tessitura è quella che porta il grosso del segnale*.
+
+Questo risultato apre però la domanda che la sezione successiva affronta: la
+tessitura del canale ematossilina è anche la grandezza più esposta alla
+variabilità tecnica.
+
+*Artefatto: `data/fase4_classification/ablation_by_family.csv`.*
+
+---
+
+## 5. Robustezza alla Variabilità di Colorazione
+
+### 5.1 Perché questo test era necessario
+
+L'ablazione della §4.4 lascia una domanda aperta e scomoda: i biomarcatori che
+portano il risultato sono quelli di **tessitura e intensità del canale
+ematossilina**, che sono anche i più esposti alla variabilità *tecnica* —
+lotto di colorazione, spessore della sezione, resa dello scanner. Se il modello
+stesse leggendo la firma del vetrino invece della cromatina, il risultato
+principale della tesi poggerebbe su un artefatto, e la validazione a blocchi
+(§3.1) non basterebbe a escluderlo: i blocchi approssimano i casi, e i casi
+differiscono anche per come sono stati colorati.
+
+Il sospetto è concreto: nella decomposizione della varianza, le feature di
+tessitura sono più legate al blocco di appartenenza (0.65 di varianza spiegata
+entro classe) di quelle morfometriche (0.41). Ma quel dato non discrimina, perché
+il blocco cattura insieme la biologia del paziente e la tecnica del vetrino.
+
+### 5.2 Il metodo
+
+Si perturba artificialmente la colorazione delle immagini **grezze** e si rifà
+girare l'**intera** pipeline, normalizzazione di Macenko compresa. La
+perturbazione è quella di Tellez et al. (2019): nello spazio delle concentrazioni
+di ematossilina ed eosina, ogni canale viene alterato in modo moltiplicativo e
+additivo,
+
+$$c' = \alpha \cdot c + \beta, \qquad \alpha \sim U(1-\sigma,\ 1+\sigma), \qquad \beta \sim U(-\sigma,\ +\sigma)\cdot \overline{|c|}$$
+
+La componente **additiva** è essenziale. La normalizzazione di Macenko riscala le
+concentrazioni al 99° percentile della reference: una perturbazione solo
+moltiplicativa verrebbe riassorbita quasi per intero e il test misurerebbe la
+propria stessa inefficacia. La parte additiva sposta la forma della distribuzione
+e sopravvive alla normalizzazione.
+
+**La geometria resta intatta.** È la premessa che rende il test valido: se la
+perturbazione danneggiasse anche la forma dei nuclei, misureremmo la robustezza a
+una degradazione dell'immagine, non alla colorazione. Verificato da un test
+automatico: segmentando l'immagine perturbata a $\sigma = 0.2$ si ritrovano gli
+stessi nuclei con IoU $> 0.75$.
+
+Campione: 50 patch per classe, $\sigma \in \{0,\ 0.1,\ 0.2,\ 0.3\}$.
+
+### 5.3 Quanto si spostano i biomarcatori
+
+Spostamento mediano, in unità di IQR del dataset — così grandezze con scale
+diverse sono confrontabili. Uno spostamento di $1.0$ significherebbe che la
+perturbazione ha mosso il biomarcatore quanto l'intero scarto interquartile.
+
+| $\sigma$ | Morfometria / spaziale | Tessitura / intensità |
+|:---:|:---:|:---:|
+| 0.10 | 0.079 | 0.066 |
+| 0.20 | 0.101 | **0.120** |
+| 0.30 | 0.139 | **0.151** |
+
+La tessitura si sposta **leggermente più** della morfometria alle perturbazioni
+forti, come atteso. Ma entrambe restano molto sotto la soglia di rilevanza: anche
+a $\sigma = 0.3$, che è una variazione di colorazione marcata, lo spostamento non
+arriva a un sesto dell'IQR.
+
+### 5.4 Tiene la capacità discriminante
+
+| $\sigma$ | AUC-ROC | $\Delta p$ mediano | $\Delta p$ 90° perc. | Patch che cambiano classe |
+|:---:|:---:|:---:|:---:|:---:|
+| 0.00 | 1.0000 | — | — | — |
+| 0.10 | 1.0000 | 0.002 | 0.074 | 1 / 100 |
+| 0.20 | 0.9948 | 0.002 | 0.120 | 2 / 100 |
+| 0.30 | 0.9836 | 0.004 | 0.249 | 8 / 100 |
+
+> **Come leggere l'AUC di questa tabella.** Il valore a $\sigma = 0$ è $1.0000$
+> perché il modello finale è addestrato su tutte le 600 patch, incluse queste
+> 100: **il livello assoluto è privo di significato**. Ciò che il test misura è
+> la *degradazione relativa*, per la quale l'ottimismo si cancella essendo lo
+> stesso a numeratore e denominatore.
+
+### 5.5 Risposta
+
+**La tessitura sta leggendo la cromatina, non il vetrino.**
+
+A $\sigma = 0.2$ — una variazione di colorazione che a occhio è evidente — il
+modello perde mezzo punto di AUC e cambia idea su 2 patch su 100. Anche a
+$\sigma = 0.3$ la perdita è di 1,6 punti e il 92% delle patch mantiene la propria
+classe. Se quelle feature codificassero l'identità del vetrino, una perturbazione
+di questa entità le avrebbe destabilizzate molto di più.
+
+Il merito è in buona parte della **normalizzazione di Macenko** della Fase 1, che
+qui mostra di fare esattamente il lavoro per cui è stata inserita. È un risultato
+che vale anche all'indietro: giustifica a posteriori una scelta metodologica che
+fino a qui era motivata solo dalla letteratura.
+
+**Due cautele oneste.** Il 90° percentile di $\Delta p$ arriva a $0.25$ a
+$\sigma = 0.3$: esiste una coda di patch — quelle già incerte, vicine alla soglia
+— che si muove parecchio. E la perturbazione è *sintetica*: riproduce la
+variabilità di colorazione in modo controllato, non la sostituisce. La prova
+definitiva resterebbe un test su vetrini di un secondo laboratorio, che questo
+dataset non permette.
+
+*Artefatti: `data/fase4_classification/stain_robustness_*.csv`,
+`img/fase4/stain_robustness.png`. Riproducibile con `python src/stain_robustness.py`.*
+
+---
+
+## 6. Conclusioni per la Tesi
 
 1. **Un modello white-box su 33 biomarcatori interpretabili raggiunge AUC-ROC $0.9401$ $[0.9057,\ 0.9744]$** nella stima conservativa, con accuratezza bilanciata $0.8617$. Il risultato è ottenuto senza mai guardare i pixel: solo grandezze misurate sui nuclei segmentati.
 
@@ -212,9 +374,13 @@ Tutte e cinque confermano il quadro clinico della Fase 3 su tre fronti indipende
 
 5. **Il pleomorfismo emerge solo in sede multivariata.** La solidità nucleare non differisce in media fra le classi, ma differisce in *dispersione*: il linfoma ha nuclei più eterogenei per regolarità di forma. È il risultato che meglio giustifica l'aggiunta di questa fase all'analisi univariata della Fase 3.
 
+6. **A portare il segnale è la tessitura cromatinica, non la morfometria.** Cinque biomarcatori di tessitura e intensità eguagliano da soli tutti e trentatré ($0.944$ contro $0.940$); i ventotto morfometrici e spaziali si fermano a $0.857$. La formulazione «biomarcatori fisici e spaziali» va quindi corretta: la tessitura è un protagonista, non un complemento. Resta white-box a pieno titolo — il pattern della cromatina è un criterio che i patologi usano e sanno nominare — ma va presentata come tale.
+
+7. **E quella tessitura legge la cromatina, non il vetrino.** Perturbando artificialmente la colorazione delle immagini grezze e rifacendo girare l'intera pipeline, a $\sigma = 0.2$ il modello perde mezzo punto di AUC e cambia idea su 2 patch su 100. Il merito è in buona parte della normalizzazione di Macenko della Fase 1, che qui riceve una giustificazione sperimentale a posteriori. Senza questo test, l'obiezione «state misurando il lotto di colorazione» sarebbe rimasta senza risposta — ed è l'obiezione più naturale da muovere a un risultato guidato dalla tessitura.
+
 ---
 
-## 6. Limitazioni da Dichiarare
+## 7. Limitazioni da Dichiarare
 
 1. **Assenza di etichette di caso.** Il partizionamento per paziente, che Carreras et al. eseguono esplicitamente (*«hybrid partitioning… using a patient-level independent validation set»*), qui **non è possibile**: il dataset pubblicato su Zenodo è piatto e non contiene identificativi. La validazione a blocchi è un'approssimazione fondata sull'ordine di numerazione — sostenuta dall'evidenza (patch adiacenti distano $0{,}62\times$ rispetto a coppie qualsiasi; il degrado monotono di §3.2; la concentrazione degli errori di §3.5) ma **non una garanzia**.
 
@@ -235,10 +401,11 @@ Tutte e cinque confermano il quadro clinico della Fase 3 su tre fronti indipende
 
 ---
 
-## 7. Riproducibilità
+## 8. Riproducibilità
 
 ```bash
-python src/04_classification.py
+python src/04_classification.py     # classificazione, SHAP, ablazione
+python src/stain_robustness.py      # test di robustezza alla colorazione
 ```
 
 Seed $42$ ovunque; versioni fissate in `requirements.txt`. Artefatti prodotti:
@@ -251,14 +418,18 @@ Seed $42$ ovunque; versioni fissate in `requirements.txt`. Artefatti prodotti:
 | `shap_importance.csv` | importanza, direzione e profilo per quintili |
 | `out_of_fold_predictions.csv` | probabilità fuori-piega, per l'analisi degli errori |
 | `best_model.joblib` | XGBoost riaddestrato su tutti i dati, con l'elenco delle feature |
+| `ablation_by_family.csv` | AUC per sottoinsieme di biomarcatori e per modello |
+| `stain_robustness_feature_shift.csv` | spostamento dei biomarcatori sotto perturbazione |
+| `stain_robustness_stability.csv` | AUC e stabilità della predizione per livello di perturbazione |
+| `stain_robustness_raw.csv` | biomarcatori ricalcolati, patch per patch e per ogni sigma |
 | `classification_metadata.json` | seed, versioni, griglie, parametri scelti |
 | `img/fase4/` | curve ROC, forbice, riepilogo SHAP, SHAP contro univariata |
 
-Le proprietà che renderebbero falsi questi numeri sono presidiate da `tests/test_classification.py`: in particolare l'assenza di sovrapposizione fra addestramento e test nella validazione a blocchi, il rifiuto di pieghe monoclasse (che produrrebbero un'AUC indefinita mediata in silenzio) e la dichiarazione di una direzione solo per gli effetti monotoni.
+Le proprietà che renderebbero falsi questi numeri sono presidiate da `tests/test_classification.py` e `tests/test_stain_robustness.py` — quest'ultimo verifica che la perturbazione cambi solo la colorazione e non la geometria dei nuclei, senza la quale il test di §5 misurerebbe un'altra cosa: in particolare l'assenza di sovrapposizione fra addestramento e test nella validazione a blocchi, il rifiuto di pieghe monoclasse (che produrrebbero un'AUC indefinita mediata in silenzio) e la dichiarazione di una direzione solo per gli effetti monotoni.
 
 ---
 
-## 8. Bibliografia
+## 9. Bibliografia
 
 1. **Carreras J, Ikoma H, Kikuti YY, et al.** (2025). *Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and Explainable Artificial Intelligence (XAI)*. **Cancers**, 17(15), 2428.
 2. **Lundberg SM, Lee SI.** (2017). *A Unified Approach to Interpreting Model Predictions*. **NIPS 2017**, pp. 4765-4774.
