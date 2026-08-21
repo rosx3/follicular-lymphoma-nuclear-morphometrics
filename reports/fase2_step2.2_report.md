@@ -5,6 +5,16 @@
 
 ---
 
+> ⚠️ **Che cosa sono davvero queste maschere.** Non sono annotazioni manuali di un
+> patologo: sono una **pseudo-Ground Truth** generata algoritmicamente dallo
+> stesso Marker-Controlled Watershed con parametri leggermente diversi. Le
+> metriche calcolate contro di esse sono quindi **inflazionate per costruzione**
+> — si confronta un algoritmo con una variante di sé stesso — e non vanno citate
+> come validazione indipendente. La validazione indipendente è quella contro la
+> Ground Truth Cellpose, in [`fase2_report.md`](file:///c:/Users/Master/Desktop/testNuovoTesi/reports/fase2_report.md) §3, con maschere
+> archiviate in `data/ground_truth/cellpose_v4/`. Il limite è discusso per esteso
+> nella nota metodologica in testa a [`src/02_segmentation.py`](file:///c:/Users/Master/Desktop/testNuovoTesi/src/02_segmentation.py).
+
 ## 1. Sintesi Risultati
 
 Lo **Step 2.2 (Creazione del Dataset Ground Truth Reference)** è stato completato con successo. È stato estratto e validato un subset benchmark di **30 patch rappresentative** (15 Linfoma Follicolare + 15 Tessuto Reattivo) con campionamento stratificato basato sulla densità cellulare.
