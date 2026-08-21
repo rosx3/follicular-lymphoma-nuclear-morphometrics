@@ -189,6 +189,14 @@ testNuovoTesi/
 - **Librerie Principali:** `numpy 2.4.3`, `scipy 1.17.1`, `scikit-image 0.26.0`, `opencv-python 5.0.0.93`, `torch 2.13.0`, `torchvision 0.28.0`, `matplotlib 3.10.8`
 - Le versioni sono **fissate esattamente** in `requirements.txt`: sono quelle sotto cui sono stati prodotti i risultati numerici riportati nei report.
 
+> **Su Windows, se `python` non funziona.** Windows installa un alias verso il
+> Microsoft Store che intercetta il comando e risponde *«Python non è stato
+> trovato»* anche quando Python è regolarmente installato. In quel caso **usare
+> `py` al posto di `python`** in tutti i comandi di questo README:
+> `py -m pytest tests/ -q`, `py src/run_pipeline.py`, `py -m streamlit run src/gui.py`.
+> In alternativa si disattiva l'alias da *Impostazioni → App → Impostazioni app
+> avanzate → Alias di esecuzione dell'app*.
+
 ```bash
 # 1. Installare le dipendenze (prima esecuzione)
 pip install -r requirements.txt
