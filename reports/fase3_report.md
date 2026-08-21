@@ -641,8 +641,9 @@ versioni, produce byte identici.
 
 1. Iwamoto R, Nishikawa T, et al. (2024). Small sized centroblasts as poor prognostic factor in follicular lymphoma. Computers in Biology and Medicine, 178, 108774.
 2. Haralick RM, Shanmugam K, Dinstein I. (1973). Textural features for image classification. IEEE Trans Systems, Man, Cybernetics, 3(6), 610-621.
-3. Ojala T, Pietikanen M, Maenpaa T. (2002). Multiresolution gray-scale and rotation invariant texture classification with local binary patterns. IEEE TPAMI, 24(7), 971-987.
-4. Carreras J, et al. (2025). Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and XAI. Cancers, 17(15), 2428.
+3. Ojala T, Pietikanen M, Maenpaa T. (2002). Multiresolution gray-scale and rotation invariant texture classification with local binary patterns. IEEE TPAMI, 24(7), 971-987. DOI: 10.1109/TPAMI.2002.1017623.
+4. Benjamini Y, Hochberg Y. (1995). Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing. Journal of the Royal Statistical Society Series B, 57(1), 289-300. DOI: 10.1111/j.2517-6161.1995.tb02031.x. — Correzione per test multipli applicata ai 47 confronti della Sezione 3.3: senza di essa, su 47 test al 5% ci si attenderebbero ~2 falsi positivi per solo effetto del caso.
+5. Carreras J, et al. (2025). Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and XAI. Cancers, 17(15), 2428. DOI: 10.3390/cancers17152428.
 
 ---
 

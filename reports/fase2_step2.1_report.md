@@ -45,8 +45,9 @@ data/fase2_segmentation/
 │   ├── masks/                   <-- 300 maschere d'istanza (16-bit PNG)
 │   └── overlays/                <-- 300 immagini RGB con contorni verdi e centroidi gialli
 ├── centroids_all.csv            <-- Master CSV con coordinate (x,y) px e µm per tutti i 94.042 nuclei
-├── segmentation_benchmark_preview.png
 └── segmentation_metadata.json   <-- Metadati completi parametri e conteggi
+
+(le anteprime visive stanno in img/fase2/, non qui)
 ```
 
 ### Struttura delle Colonne del File CSV Master (`centroids_all.csv`)
@@ -68,7 +69,7 @@ data/fase2_segmentation/
 ## 4. Evidenza Visiva
 
 Un'anteprima comparativa a 4 campioni (2 FL e 2 REACTIVE) mostra l'eccellente precisione dell'estrazione dei contorni e dei centroidi:  
-🖼️ **[segmentation_benchmark_preview.png](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/segmentation_benchmark_preview.png)**
+🖼️ **[`img/fase2/segmentation_benchmark_preview.png`](file:///c:/Users/Master/Desktop/testNuovoTesi/img/fase2/segmentation_benchmark_preview.png)**
 
 ---
 

@@ -431,8 +431,10 @@ Le proprietà che renderebbero falsi questi numeri sono presidiate da `tests/tes
 
 ## 9. Bibliografia
 
-1. **Carreras J, Ikoma H, Kikuti YY, et al.** (2025). *Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and Explainable Artificial Intelligence (XAI)*. **Cancers**, 17(15), 2428.
-2. **Lundberg SM, Lee SI.** (2017). *A Unified Approach to Interpreting Model Predictions*. **NIPS 2017**, pp. 4765-4774.
-3. **Lundberg SM, Erion G, Chen H, et al.** (2020). *From local explanations to global understanding with explainable AI for trees*. **Nature Machine Intelligence**, 2, 56-67.
-4. **Chen T, Guestrin C.** (2016). *XGBoost: A Scalable Tree Boosting System*. **KDD 2016**, pp. 785-794.
-5. **Iwamoto R, Nishikawa T, Musangile FY, et al.** (2024). *Small sized centroblasts as poor prognostic factor in follicular lymphoma*. **Computers in Biology and Medicine**, 178, 108774.
+1. **Carreras J, Ikoma H, Kikuti YY, et al.** (2025). *Histological Image Classification Between Follicular Lymphoma and Reactive Lymphoid Tissue Using Deep Learning and Explainable Artificial Intelligence (XAI)*. **Cancers**, 17(15), 2428. DOI: 10.3390/cancers17152428.
+2. **Lundberg SM, Lee SI.** (2017). *A Unified Approach to Interpreting Model Predictions*. **NIPS 2017**, pp. 4765-4774. arXiv: 1705.07874. — *Fondamento teorico dei valori SHAP e della proprietà di additività verificata in §4.*
+3. **Lundberg SM, Erion G, Chen H, et al.** (2020). *From local explanations to global understanding with explainable AI for trees*. **Nature Machine Intelligence**, 2, 56-67. DOI: 10.1038/s42256-019-0138-9. — *`TreeExplainer`, esatto per i modelli ad albero: è il motivo per cui le spiegazioni di §4 non sono approssimate.*
+4. **Chen T, Guestrin C.** (2016). *XGBoost: A Scalable Tree Boosting System*. **KDD 2016**, pp. 785-794. DOI: 10.1145/2939672.2939785. — *Il modello selezionato dalla validazione conservativa.*
+5. **Iwamoto R, Nishikawa T, Musangile FY, et al.** (2024). *Small sized centroblasts as poor prognostic factor in follicular lymphoma*. **Computers in Biology and Medicine**, 178, 108774. — *Origine dei biomarcatori `area_top10_*` sui centroblasti.*
+6. **Macenko M, Niethammer M, Marron JS, et al.** (2009). *A method for normalizing histology slides for quantitative analysis*. **IEEE ISBI**, pp. 1107-1110. DOI: 10.1109/ISBI.2009.5193250. — *La normalizzazione della Fase 1, di cui §5 fornisce una giustificazione sperimentale a posteriori.*
+7. **Tellez D, Litjens G, Bándi P, et al.** (2019). *Quantifying the effects of data augmentation and stain color normalization in convolutional neural networks for computational pathology*. **Medical Image Analysis**, 58, 101544. DOI: 10.1016/j.media.2019.101544. — *Schema di perturbazione della colorazione ($c' = \alpha c + \beta$) adottato in §5.2.*
