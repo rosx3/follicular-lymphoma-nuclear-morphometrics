@@ -44,5 +44,12 @@ tqdm==4.67.3
 joblib==1.5.3
 
 # === Test (sviluppo) ===
-# Esecuzione: python -m pytest tests/ -q
+# Suite rapida:      python -m pytest tests/ -q -m "not e2e"
+# Solo end-to-end:   python -m pytest tests/test_gui_e2e.py -q
 pytest==9.1.1
+
+# Test end-to-end della GUI con un browser vero. Servono perche' AppTest non sa
+# simulare il caricamento di un file, lasciando scoperto proprio il percorso
+# principale dell'interfaccia. Dopo l'installazione serve anche il browser:
+#     python -m playwright install chromium
+pytest-playwright==0.9.0

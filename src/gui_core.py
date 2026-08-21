@@ -18,6 +18,7 @@ elaborando un'immagine gia' nel dataset si riottengano i valori memorizzati.
 import importlib.util
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
@@ -192,3 +193,131 @@ def process_image(image_rgb: np.ndarray, normalizer) -> dict:
         "nuclei": nuclei,
         "features": features,
     }
+
+
+# ---------------------------------------------------------------------------
+# Collegamento del classificatore della Fase 4
+#
+# Il modello non usa tutti e 47 i biomarcatori: la Fase 4 ne scarta 14 perche'
+# ridondanti (|rho| > 0.90), e l'artefatto salvato porta con se' l'elenco dei 33
+# sopravvissuti. Passare le colonne in un ordine diverso produrrebbe predizioni
+# sbagliate senza che nulla protesti, quindi la selezione avviene sempre per
+# nome, mai per posizione.
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class Classifier:
+    """Modello della Fase 4 con i biomarcatori su cui e' stato addestrato."""
+
+    model: object            # Pipeline scikit-learn
+    features: list[str]
+
+
+@dataclass(frozen=True)
+class LocalExplanation:
+    """Perche' il modello ha deciso cosi' per una singola patch."""
+
+    contributions: object    # DataFrame: feature, value, contribution
+    expected_value: float    # uscita media del modello sul dataset
+    raw_output: float        # uscita per questa patch
+    probability: float
+
+
+def load_classifier(fase4_dir: Path) -> Classifier:
+    """
+    Carica il modello scelto dalla Fase 4.
+
+    Raises:
+        FileNotFoundError: se il modello non e' stato ancora prodotto.
+    """
+    import joblib
+
+    model_path = Path(fase4_dir) / "best_model.joblib"
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"{model_path} non trovato: eseguire prima `python src/04_classification.py`."
+        )
+    payload = joblib.load(model_path)
+    return Classifier(model=payload["model"], features=list(payload["features"]))
+
+
+def _feature_row(classifier: Classifier, features: dict) -> np.ndarray:
+    """I biomarcatori richiesti dal modello, nell'ordine in cui li vuole."""
+    missing = [name for name in classifier.features if name not in features]
+    if missing:
+        raise KeyError(
+            f"biomarcatori mancanti per la predizione: {missing}. "
+            "Sono quelli su cui il modello e' stato addestrato."
+        )
+    return np.array([[float(features[name]) for name in classifier.features]])
+
+
+def predict_patch(classifier: Classifier, features: dict) -> float:
+    """Probabilita' che la patch sia linfoma follicolare."""
+    return float(classifier.model.predict_proba(_feature_row(classifier, features))[0, 1])
+
+
+def explain_patch(classifier: Classifier, features: dict) -> LocalExplanation:
+    """
+    Contributo di ciascun biomarcatore alla decisione su QUESTA patch.
+
+    Vale la proprieta' fondativa di SHAP: valore atteso + somma dei contributi =
+    uscita del modello. E' cio' che rende il grafico a cascata una spiegazione e
+    non un disegno, ed e' verificato da un test.
+
+    Il modello scelto dalla Fase 4 e' basato su alberi (XGBoost): per questi
+    l'explainer e' esatto, non approssimato.
+    """
+    import pandas as pd
+    import shap
+
+    row = _feature_row(classifier, features)
+    steps = getattr(classifier.model, "steps", None)
+    estimator = steps[-1][1] if steps else classifier.model
+    transformed = classifier.model[:-1].transform(row) if steps and len(steps) > 1 else row
+
+    explainer = shap.TreeExplainer(estimator)
+    values = np.asarray(explainer.shap_values(transformed))
+    if values.ndim == 3:              # (1, n_feature, 2) per la classificazione binaria
+        values = values[:, :, 1]
+    contributions = values[0]
+
+    expected = float(np.atleast_1d(explainer.expected_value)[-1])
+
+    # L'uscita va ricalcolata dal modello, non dedotta dai contributi: e' cio'
+    # che rende verificabile l'additivita' invece di darla per scontata.
+    if type(estimator).__name__.startswith("XGB"):
+        raw_output = float(estimator.predict(transformed, output_margin=True)[0])
+    else:
+        raw_output = float(estimator.predict_proba(transformed)[0, 1])
+
+    table = pd.DataFrame({
+        "feature": classifier.features,
+        "value": [float(features[name]) for name in classifier.features],
+        "contribution": contributions,
+    }).sort_values("contribution", key=np.abs, ascending=False, ignore_index=True)
+
+    return LocalExplanation(
+        contributions=table,
+        expected_value=expected,
+        raw_output=raw_output,
+        probability=predict_patch(classifier, features),
+    )
+
+
+def load_out_of_fold_predictions(fase4_dir: Path):
+    """
+    Predizioni fuori-piega registrate dalla Fase 4.
+
+    Per una patch del dataset e' l'unica predizione onesta: quella prodotta
+    nella piega in cui la patch era in test, da un modello che non l'aveva mai
+    vista in addestramento. Rieseguire il modello finale su una patch che ha gia'
+    visto darebbe un numero ottimistico e privo di significato.
+    """
+    import pandas as pd
+
+    path = Path(fase4_dir) / "out_of_fold_predictions.csv"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} non trovato: eseguire prima `python src/04_classification.py`."
+        )
+    return pd.read_csv(path)

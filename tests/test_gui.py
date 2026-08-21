@@ -4,9 +4,9 @@ Test dell'interfaccia Streamlit (src/gui.py).
 L'interfaccia e' un guscio di widget: la logica che produce i numeri sta in
 src/gui_core.py ed e' gia' coperta da test_gui_core.py. Qui si verifica cio'
 che quei test non possono vedere, cioe' che il guscio regga: che l'app parta
-senza eccezioni, che le tre sezioni esistano, che la tabella dei biomarcatori
-segua davvero la patch selezionata e che l'app dichiari di non fornire una
-diagnosi (il classificatore e' la Fase 4, ancora non implementata).
+senza eccezioni, che le quattro sezioni esistano, che la tabella dei biomarcatori
+segua davvero la patch selezionata, e che la sezione di spiegabilita' pubblichi
+la stima conservativa segnalando gli effetti non monotoni.
 
 Il tutto gira headless con streamlit.testing.v1.AppTest: nessun browser.
 """
@@ -45,12 +45,18 @@ def test_the_app_starts_without_raising(app: AppTest):
     assert not app.exception, [e.value for e in app.exception]
 
 
-def test_the_app_offers_the_three_sections(app: AppTest):
-    assert [tab.label for tab in app.tabs] == [
+def test_the_app_offers_the_four_sections(app: AppTest):
+    # La sezione di spiegabilita' contiene a sua volta delle tab, che AppTest
+    # elenca insieme a quelle principali: si verifica la sottosequenza.
+    main_sections = [
         "Esplora dataset",
         "Analizza immagine",
+        "Spiegabilita'",
         "Risultati Fase 3",
     ]
+    labels = [tab.label for tab in app.tabs]
+
+    assert [label for label in labels if label in main_sections] == main_sections
 
 
 # --------------------------------------------------------------------------
@@ -90,11 +96,16 @@ def test_switching_category_offers_the_patches_of_that_category(app: AppTest):
 # --------------------------------------------------------------------------
 # Sezione 2 — analisi di un'immagine nuova
 # --------------------------------------------------------------------------
-def test_the_analyzer_states_that_it_does_not_provide_a_diagnosis(app: AppTest):
+def test_the_analyzer_states_that_it_is_not_a_diagnostic_device(app: AppTest):
+    """
+    Ora che il modello e' collegato, l'avviso non riguarda piu' una funzione
+    mancante ma il limite di cio' che c'e': uno strumento di ricerca addestrato
+    su 600 patch di due sole classi, che risponde comunque anche fuori dominio.
+    """
     disclaimers = [w.value for w in app.warning]
 
-    assert any("Fase 4" in text for text in disclaimers), (
-        "l'app non dichiara che la classificazione non e' implementata"
+    assert any("dispositivo diagnostico" in text for text in disclaimers), (
+        "l'app non dichiara di non essere un dispositivo diagnostico"
     )
 
 
@@ -156,3 +167,53 @@ def test_the_results_section_shows_the_separability_of_every_biomarker(app: AppT
 
     assert len(table) == 47
     assert table["significant"].sum() == 37, "i significativi non sono i 37 del report"
+
+
+# --------------------------------------------------------------------------
+# Sezione 3 — spiegabilita' (Fase 4)
+# --------------------------------------------------------------------------
+def test_the_explainability_section_publishes_the_conservative_estimate(app: AppTest):
+    """
+    Il numero da citare in tesi e' quello della validazione conservativa, non
+    quello ottimistico: la sezione deve dirlo esplicitamente.
+    """
+    messages = [element.value for element in app.success]
+
+    assert any("conservativa" in text for text in messages), (
+        "la sezione non dichiara quale delle due stime va citata"
+    )
+
+
+def test_the_explainability_section_shows_the_shap_ranking(app: AppTest):
+    table = _table_with_column(app, "direction")
+
+    assert "importance" in table.columns
+    assert len(table) == 33, "la classifica non copre i 33 biomarcatori del modello"
+
+
+def test_the_explainability_section_flags_non_monotone_effects(app: AppTest):
+    """
+    Dichiarare una direzione per un effetto a U metterebbe un'affermazione falsa
+    nella tesi: quei biomarcatori vanno segnalati, non riassunti con una freccia.
+    """
+    table = _table_with_column(app, "direction")
+
+    assert "non monotona" in set(table["direction"]), (
+        "nessun effetto segnalato come non monotono: la colonna direction non "
+        "sta distinguendo i casi"
+    )
+
+
+def test_the_app_forces_a_headless_matplotlib_backend():
+    """
+    Streamlit esegue lo script in un thread separato. Col backend Tk (predefinito
+    su Windows) la figura del waterfall nasce in quel thread e viene distrutta dal
+    principale: Tk aborta il processo con "Tcl_AsyncDelete: async handler deleted
+    by the wrong thread". Non e' un test che fallisce, e' la suite che muore —
+    quindi la guardia sta qui, non nel messaggio d'errore di qualcun altro.
+    """
+    import matplotlib
+
+    import gui  # noqa: F401  (l'import e' cio' che deve impostare il backend)
+
+    assert matplotlib.get_backend().lower() == "agg"
