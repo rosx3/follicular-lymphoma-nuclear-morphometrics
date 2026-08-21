@@ -90,7 +90,7 @@ testNuovoTesi/
 │   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
 │   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
 │
-├── tests/                                 # Test automatici (pytest) — 183 test
+├── tests/                                 # Test automatici (pytest) — 199 test
 │   ├── test_calibration.py                # Calibrazione e assenza di duplicazioni
 │   ├── test_naming.py                     # Convenzioni di naming e categorie
 │   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
@@ -103,6 +103,7 @@ testNuovoTesi/
 │   ├── test_segmentation_split.py         # Split stratificato train/val
 │   ├── test_gui_core.py                   # Coerenza GUI ↔ pipeline sui biomarcatori
 │   ├── test_gui.py                        # Interfaccia Streamlit headless (AppTest)
+│   ├── test_gui_e2e.py                    # Interfaccia con browser vero (Playwright)
 │   ├── test_classification.py             # Fase 4: blocchi, riduzione ridondanze, SHAP
 │   └── test_segmentation_reproducibility.py  # I default rigenerano le maschere del dataset
 │
@@ -194,8 +195,21 @@ python src/run_pipeline.py --fase 2        # Solo Segmentazione
 python src/01_preprocessing.py            # [TEST] self-test modulo Preprocessing
 python src/02_segmentation.py             # [TEST] self-test modulo Segmentazione
 
-# Suite di test automatici
-python -m pytest tests/ -q
+# Suite di test automatici (rapida: esclude i test col browser)
+python -m pytest tests/ -q -m "not e2e"
+```
+
+#### Test end-to-end dell'interfaccia
+
+La suite rapida collauda la GUI con `streamlit.testing.v1.AppTest`, che esegue
+l'app senza browser: veloce, ma **non sa simulare il caricamento di un file**,
+lasciando scoperto il percorso principale dell'interfaccia. Quel percorso è
+coperto da test separati che aprono davvero un browser e caricano davvero
+un'immagine dal disco.
+
+```bash
+pip install pytest-playwright && python -m playwright install chromium
+python -m pytest tests/test_gui_e2e.py -q
 ```
 
 ### Interfaccia grafica

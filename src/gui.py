@@ -7,15 +7,19 @@ Guscio di widget sopra src/gui_core.py. Qui non c'e' logica scientifica: ogni
 numero mostrato arriva dalle stesse funzioni chiamate da run_pipeline.py, cosi'
 l'interfaccia non puo' divergere in silenzio dai CSV della tesi.
 
-Tre sezioni:
+Quattro sezioni:
   1. Esplora dataset   — i cinque stadi della pipeline su una patch gia'
-                         elaborata, con i 47 biomarcatori posizionati nella
-                         distribuzione della loro classe.
-  2. Analizza immagine — un'immagine nuova percorre Fase 1 -> 2 -> 3 dal vivo e
-                         viene confrontata con entrambe le classi. Nessuna
-                         diagnosi: il classificatore e' la Fase 4, ancora non
-                         implementata.
-  3. Risultati Fase 3  — figure e test di separabilita' gia' prodotti, il
+                         elaborata, i 47 biomarcatori posizionati nella
+                         distribuzione della loro classe e la predizione
+                         fuori-piega del modello.
+  2. Analizza immagine — un'immagine nuova percorre Fase 1 -> 2 -> 3 dal vivo,
+                         viene classificata e la decisione viene spiegata.
+  3. Spiegabilita'     — l'analisi dei risultati della Fase 4: la forbice fra
+                         validazione ottimistica e conservativa, quali
+                         biomarcatori decidono e in che direzione (dichiarata
+                         solo dove l'effetto e' monotono), e la spiegazione
+                         locale di un caso a scelta, calcolata dal vivo.
+  4. Risultati Fase 3  — figure e test di separabilita' gia' prodotti, il
                          contesto statistico che rende leggibili i percentili.
 
 Avvio:
@@ -27,10 +31,19 @@ import sys
 from pathlib import Path
 
 import cv2
+import matplotlib
 import numpy as np
 import pandas as pd
 import streamlit as st
 from skimage.color import label2rgb
+
+# Un'app Streamlit non ha un display, e soprattutto esegue lo script in un thread
+# separato. Col backend predefinito di questa macchina (Tk) la figura del
+# waterfall nasce in quel thread e viene distrutta dal thread principale alla
+# chiusura: Tk aborta il processo con "Tcl_AsyncDelete: async handler deleted by
+# the wrong thread", uccidendo la suite di test invece di fallire. Agg non ha
+# alcuna GUI e non ha il problema. Va impostato PRIMA del primo import di pyplot.
+matplotlib.use("Agg")
 
 _SRC_DIR = Path(__file__).resolve().parent
 if str(_SRC_DIR) not in sys.path:
@@ -41,7 +54,9 @@ from gui_core import (  # noqa: E402
     PATCH_FEATURE_COLUMNS,
     available_patches,
     build_normalizer,
+    explain_patch,
     feature_percentile,
+    load_classifier,
     load_patch_images,
     load_reference_image,
     process_image,
@@ -57,6 +72,12 @@ IMG_FASE3_DIR = BASE_DIR / "img" / "fase3"
 
 MASTER_CSV = FASE3_DIR / "features_patches_master.csv"
 SEPARABILITY_CSV = FASE3_DIR / "separability_tests.csv"
+
+FASE4_DIR = BASE_DIR / "data" / "fase4_classification"
+IMG_FASE4_DIR = BASE_DIR / "img" / "fase4"
+METRICS_CSV = FASE4_DIR / "metrics_by_model.csv"
+SENSITIVITY_CSV = FASE4_DIR / "block_size_sensitivity.csv"
+REDUCTION_CSV = FASE4_DIR / "feature_reduction.csv"
 
 FIGURES = {
     "boxplot_top_features.png": "Biomarcatori piu' discriminanti, FL vs REACTIVE",
@@ -85,6 +106,24 @@ def load_separability_table() -> pd.DataFrame:
 def load_catalogue() -> dict[str, list[str]]:
     """Stem delle patch disponibili, per categoria."""
     return available_patches(FASE2_DIR)
+
+
+@st.cache_data(show_spinner=False)
+def load_fase4_table(file_name: str) -> pd.DataFrame:
+    """Una delle tabelle prodotte dalla Fase 4, letta una volta per sessione."""
+    return pd.read_csv(FASE4_DIR / file_name)
+
+
+@st.cache_resource(show_spinner=False)
+def get_classifier():
+    """
+    Modello della Fase 4, caricato una volta per processo.
+
+    E' addestrato sui 33 biomarcatori sopravvissuti alla riduzione delle
+    ridondanze: l'artefatto porta con se' l'elenco, e la selezione avviene per
+    nome, mai per posizione.
+    """
+    return load_classifier(FASE4_DIR)
 
 
 @st.cache_resource(show_spinner=False)
@@ -147,6 +186,53 @@ def _positioned_table(
     return pd.DataFrame(records)
 
 
+def _render_probability(probability: float, truth: int | None = None) -> None:
+    """Probabilita' di linfoma follicolare, con l'esito quando la verita' e' nota."""
+    predicted = "FL" if probability >= 0.5 else "REACTIVE"
+    confidence = probability if probability >= 0.5 else 1 - probability
+
+    left, middle, right = st.columns(3)
+    left.metric("Probabilita' di linfoma follicolare", f"{probability:.1%}")
+    middle.metric("Classe predetta", predicted, f"confidenza {confidence:.0%}")
+    if truth is not None:
+        actual = "FL" if truth == 1 else "REACTIVE"
+        correct = (probability >= 0.5) == (truth == 1)
+        right.metric("Classe reale", actual, "corretta" if correct else "SBAGLIATA",
+                     delta_color="normal" if correct else "inverse")
+    st.progress(float(probability))
+
+
+def _render_waterfall(explanation, top_n: int = 12) -> None:
+    """
+    Contributi che hanno spostato la decisione su questa patch.
+
+    E' la spiegazione locale: non "quali biomarcatori contano in generale", ma
+    "quali hanno deciso QUI, e di quanto". La somma dei contributi piu' il valore
+    atteso ricostruisce esattamente l'uscita del modello.
+    """
+    import matplotlib.pyplot as plt
+
+    top = explanation.contributions.head(top_n).iloc[::-1]
+    colors = ["#c0392b" if c > 0 else "#2471a3" for c in top["contribution"]]
+    labels = [f"{row.feature} = {row.value:.3g}" for row in top.itertuples()]
+
+    fig, ax = plt.subplots(figsize=(8, 0.42 * len(top) + 1.2))
+    ax.barh(range(len(top)), top["contribution"], color=colors)
+    ax.set_yticks(range(len(top)), labels, fontsize=9)
+    ax.axvline(0, color="black", linewidth=0.8)
+    ax.set_xlabel("contributo alla decisione  (rosso -> FL, blu -> REACTIVE)")
+    ax.set_title("Perche' il modello ha deciso cosi'")
+    fig.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
+
+    st.caption(
+        f"Valore atteso {explanation.expected_value:+.3f} + somma dei contributi "
+        f"= {explanation.raw_output:+.3f} (log-odds). E' la proprieta' che rende "
+        "questo grafico una spiegazione e non un'illustrazione: e' verificata da un test."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sezione 1 — esplorazione di una patch gia' elaborata
 # ---------------------------------------------------------------------------
@@ -184,6 +270,8 @@ def render_explorer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
     values = row.iloc[0]
     st.metric("Nuclei segmentati", int(values["n_nuclei"]))
 
+    _render_out_of_fold_prediction(stem, int(values["target"]))
+
     st.subheader("Biomarcatori")
     st.caption(
         "`percentile_classe` dice quanto la patch e' tipica rispetto alla propria "
@@ -198,16 +286,66 @@ def render_explorer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
     )
 
 
+def _render_out_of_fold_prediction(stem: str, truth: int) -> None:
+    """
+    Predizione del modello per una patch del dataset.
+
+    Si mostra quella FUORI-PIEGA registrata dalla Fase 4, non una predizione
+    calcolata al momento: il modello finale e' stato addestrato su tutte le 600
+    patch, quindi rieseguirlo su una di esse restituirebbe un numero ottimistico
+    e privo di significato. La predizione fuori-piega viene invece da un modello
+    che quella patch non l'aveva mai vista.
+    """
+    if not (FASE4_DIR / "out_of_fold_predictions.csv").exists():
+        return
+
+    predictions = load_fase4_table("out_of_fold_predictions.csv")
+    rows = predictions[predictions["image_name"] == stem]
+    if rows.empty:
+        return
+
+    st.subheader("Predizione del modello (Fase 4)")
+    validation = st.radio(
+        "Validazione",
+        sorted(rows["validation"].unique()),
+        horizontal=True,
+        key="oof_validation",
+        help=(
+            "A_casuale: split casuale, stima ottimistica perche' patch dello stesso "
+            "caso possono finire sia in addestramento sia in test. B_blocchi: split "
+            "a blocchi contigui, stima conservativa."
+        ),
+    )
+    subset = rows[rows["validation"] == validation]
+    models = sorted(subset["model"].unique())
+    model = st.selectbox(
+        "Modello", models,
+        index=models.index("xgboost") if "xgboost" in models else 0,
+        key="oof_model",
+    )
+
+    chosen = subset[subset["model"] == model]
+    if chosen.empty:
+        return
+    _render_probability(float(chosen.iloc[0]["y_prob"]), truth=truth)
+    st.caption(
+        "Predizione **fuori-piega**: prodotta nella piega in cui questa patch era "
+        "in test, da un modello che non l'aveva vista in addestramento. E' l'unica "
+        "onesta per una patch del dataset."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sezione 2 — analisi di un'immagine nuova
 # ---------------------------------------------------------------------------
 def render_analyzer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
     st.warning(
-        "Questa sezione **non fornisce una diagnosi**: misura biomarcatori e li "
-        "confronta con le distribuzioni delle due classi. Il classificatore della "
-        "Fase 4 esiste (AUC-ROC 0.94 in validazione conservativa) ma non e' "
-        "collegato a questa interfaccia: collegarlo e' una decisione successiva, "
-        "non un dettaglio tecnico.",
+        "**Non e' un dispositivo diagnostico.** Il modello e' stato addestrato su "
+        "600 patch di due sole classi e raggiunge un AUC-ROC di 0.94 in validazione "
+        "conservativa: e' uno strumento di ricerca, non un supporto alla decisione "
+        "clinica. Su un'immagine che non sia una patch linfonodale H&E risponde "
+        "comunque, con una sicurezza che non ha alcun fondamento — non avendo mai "
+        "visto nulla di diverso, non puo' sapere di essere fuori dal proprio dominio.",
         icon="⚠️",
     )
     st.caption(
@@ -271,6 +409,25 @@ def render_analyzer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
         )
         return
 
+    if (FASE4_DIR / "best_model.joblib").exists():
+        st.subheader("Predizione del modello")
+        with st.spinner("Classificazione e spiegazione..."):
+            explanation = explain_patch(get_classifier(), result["features"])
+        _render_probability(explanation.probability)
+
+        st.subheader("Spiegazione della decisione")
+        st.caption(
+            "Contributo di ciascun biomarcatore a QUESTA decisione: non quanto "
+            "conta in generale, ma quanto ha pesato qui e in quale direzione."
+        )
+        _render_waterfall(explanation)
+    else:
+        st.info(
+            "Modello della Fase 4 non presente: eseguire "
+            "`python src/04_classification.py` per abilitare la predizione.",
+            icon="ℹ️",
+        )
+
     st.subheader("Biomarcatori a confronto con le due classi")
     st.caption(
         "Per ogni biomarcatore, il percentile occupato nella distribuzione di "
@@ -290,7 +447,203 @@ def render_analyzer(master: pd.DataFrame, significant: dict[str, bool]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sezione 3 — risultati statistici della Fase 3
+# Sezione 3 — spiegabilita' e analisi dei risultati (Fase 4)
+# ---------------------------------------------------------------------------
+def _render_validation_gap(metrics: pd.DataFrame) -> None:
+    """La forbice fra validazione ottimistica e conservativa."""
+    st.subheader("Quanto del punteggio era leakage")
+    st.caption(
+        "Le 600 patch vengono da ~221 casi, con piu' patch per caso, e il dataset "
+        "non contiene identificativi di paziente. Con uno split casuale patch dello "
+        "stesso vetrino finiscono da entrambe le parti e il modello puo' "
+        "riconoscere il vetrino invece della biologia. Ogni modello e' quindi "
+        "valutato due volte: **la forbice fra le due misura il leakage invece di "
+        "nasconderlo**."
+    )
+
+    summary = metrics.groupby(["model", "validation"])["auc_roc"].mean().unstack()
+    summary["forbice"] = summary["A_casuale"] - summary["B_blocchi"]
+    summary = summary.sort_values("B_blocchi", ascending=False)
+
+    for model, row in summary.iterrows():
+        left, middle, right = st.columns(3)
+        left.metric(f"{model} — A casuale", f"{row['A_casuale']:.4f}",
+                    help="Split casuale: stima ottimistica, contaminata dal leakage.")
+        middle.metric("B a blocchi", f"{row['B_blocchi']:.4f}",
+                      help="Split a blocchi contigui: stima conservativa. E' quella da citare.")
+        right.metric("Forbice", f"{row['forbice']:+.4f}",
+                     help="Quanto del punteggio spariva togliendo il leakage.")
+
+    best = summary.index[0]
+    st.success(
+        f"**Il numero da portare in tesi e' {summary.loc[best, 'B_blocchi']:.4f}** "
+        f"di AUC-ROC ({best}, validazione conservativa). La forbice e' di appena "
+        f"{summary.loc[best, 'forbice']:.3f}: il leakage c'era, ma pesava poco.",
+        icon="✅",
+    )
+
+    gap_figure = IMG_FASE4_DIR / "validation_gap.png"
+    if gap_figure.exists():
+        st.image(str(gap_figure), caption="Forbice fra le due validazioni, per modello")
+
+
+def _render_global_explainability() -> None:
+    """Classifica SHAP globale, con gli effetti non monotoni dichiarati come tali."""
+    importance = load_fase4_table("shap_importance.csv")
+
+    st.subheader("Quali biomarcatori decidono, e in che direzione")
+    st.caption(
+        "`importance` e' la media dei contributi in valore assoluto. `direction` "
+        "dice verso quale classe spingono i valori alti — ma solo quando ha senso "
+        "dirlo."
+    )
+
+    non_monotone = importance[importance["direction"] == "non monotona"]
+    monotone = importance[importance["direction"] != "non monotona"]
+
+    st.dataframe(importance, width="stretch", hide_index=True)
+
+    if not non_monotone.empty:
+        names = ", ".join(f"`{f}`" for f in non_monotone["feature"].head(5))
+        with st.expander(
+            f"⚠️ {len(non_monotone)} biomarcatori hanno un effetto NON monotono — "
+            "perche' e' importante", expanded=True,
+        ):
+            st.markdown(
+                f"""
+Per {names} non esiste una direzione da dichiarare: **valori estremi in
+entrambi i sensi spingono verso la stessa classe**.
+
+Il caso da raccontare in discussione e' `solidity_mean`. Le medie delle due
+classi sono quasi identiche — il test univariato della Fase 3 non lo trova
+significativo — ma le **dispersioni** sono molto diverse. Il modello lo usa
+comunque, e lo usa a U: nuclei con solidita' molto bassa *e* nuclei con
+solidita' molto alta spingono entrambi verso il linfoma.
+
+Una correlazione lineare fra valore e contributo qui restituirebbe un numero
+vicino a zero, e riassumerla con una freccia direbbe una cosa falsa. Il profilo
+per quintili nella colonna `quintile_profile` mostra la forma reale: si legge da
+sinistra (valori bassi) a destra (valori alti).
+
+**E' un risultato, non un difetto**: un biomarcatore che l'analisi univariata
+scarta si rivela utile a un modello multivariato, e solo guardando la forma
+dell'effetto si capisce perche'.
+"""
+            )
+
+    st.caption(
+        f"{len(monotone)} biomarcatori su {len(importance)} hanno un effetto "
+        "monotono e una direzione dichiarabile."
+    )
+
+    comparison = IMG_FASE4_DIR / "shap_vs_univariate.png"
+    if comparison.exists():
+        st.image(
+            str(comparison),
+            caption="Gerarchia SHAP (multivariata) contro effect size univariati della Fase 3",
+        )
+
+
+def _render_local_explainability(master: pd.DataFrame) -> None:
+    """Spiegazione locale calcolata dal vivo su una patch scelta dall'utente."""
+    st.subheader("Spiegazione di un caso singolo")
+    st.caption(
+        "Scegli una patch e osserva **perche'** il modello decide cosi': quali "
+        "biomarcatori spostano la decisione, di quanto e in quale direzione. "
+        "Calcolato sul momento, non una figura preparata."
+    )
+
+    left, right = st.columns([1, 2])
+    category = left.selectbox("Categoria", CATEGORIES, format_func=short_label,
+                              key="xai_categoria")
+    candidates = master.loc[master["category"] == category, "image_name"].tolist()
+    stem = right.selectbox("Patch", candidates, key="xai_patch")
+
+    row = master.loc[master["image_name"] == stem]
+    if row.empty:
+        return
+    values = row.iloc[0]
+    features = {k: float(v) for k, v in values.items() if k not in ("category", "image_name")}
+
+    with st.spinner("Calcolo della spiegazione..."):
+        explanation = explain_patch(get_classifier(), features)
+
+    _render_probability(explanation.probability, truth=int(values["target"]))
+    _render_waterfall(explanation)
+    st.caption(
+        "Nota: la spiegazione usa il modello finale, addestrato su tutte le 600 "
+        "patch. Serve a mostrare il **ragionamento**, non a stimare le prestazioni "
+        "— per quelle valgono solo le predizioni fuori-piega."
+    )
+
+
+def render_explainability(master: pd.DataFrame) -> None:
+    if not METRICS_CSV.exists() or not (FASE4_DIR / "best_model.joblib").exists():
+        st.error(
+            "Risultati della Fase 4 mancanti. Eseguire prima "
+            "`python src/04_classification.py`."
+        )
+        return
+
+    metrics = load_fase4_table("metrics_by_model.csv")
+    _render_validation_gap(metrics)
+    st.divider()
+    _render_global_explainability()
+    st.divider()
+    _render_local_explainability(master)
+    st.divider()
+
+    st.subheader("Robustezza e dettagli del metodo")
+    sensitivity_tab, roc_tab, reduction_tab, folds_tab = st.tabs(
+        ["Sensibilita' al blocco", "Curve ROC", "Riduzione 47 -> 33", "Metriche per piega"]
+    )
+
+    with sensitivity_tab:
+        st.caption(
+            "La conclusione non deve dipendere da un parametro arbitrario: la "
+            "validazione conservativa e' ripetuta con blocchi di dimensione "
+            "diversa. Un degrado al crescere del blocco indicherebbe una "
+            "dipendenza reale dal vicinato."
+        )
+        if SENSITIVITY_CSV.exists():
+            sensitivity = load_fase4_table("block_size_sensitivity.csv")
+            pivot = sensitivity.groupby(["block_size", "model"])["auc_roc"].mean().unstack()
+            st.line_chart(pivot)
+            st.dataframe(pivot, width="stretch")
+
+    with roc_tab:
+        roc_figure = IMG_FASE4_DIR / "roc_curves.png"
+        if roc_figure.exists():
+            st.image(str(roc_figure), caption="ROC fuori-piega, entrambe le validazioni")
+
+    with reduction_tab:
+        st.caption(
+            "Fra biomarcatori quasi identici (|rho| > 0.90) ne resta uno solo: "
+            "SHAP dividerebbe il merito fra le copie, facendole apparire entrambe "
+            "meno importanti di quanto sono. A parita' di ridondanza si tiene la "
+            "variabile **piu' leggibile clinicamente**, non quella statisticamente "
+            "piu' forte."
+        )
+        if REDUCTION_CSV.exists():
+            reduction = load_fase4_table("feature_reduction.csv")
+            st.dataframe(
+                reduction[~reduction["kept"]][["feature", "representative"]].rename(
+                    columns={"feature": "scartato", "representative": "rappresentato da"}
+                ),
+                width="stretch", hide_index=True,
+            )
+
+    with folds_tab:
+        st.caption(
+            "Le medie nascondono la variabilita': con poche unita' indipendenti "
+            "nella validazione a blocchi, la dispersione fra pieghe e' ampia e va "
+            "guardata prima di dichiarare un modello migliore di un altro."
+        )
+        st.dataframe(metrics, width="stretch", hide_index=True)
+
+
+# ---------------------------------------------------------------------------
+# Sezione 4 — risultati statistici della Fase 3
 # ---------------------------------------------------------------------------
 def render_results(separability: pd.DataFrame) -> None:
     n_significant = int(separability["significant"].sum())
@@ -345,13 +698,15 @@ def main() -> None:
     separability = load_separability_table()
     significant = separability.set_index("feature")["significant"].to_dict()
 
-    explorer, analyzer, results = st.tabs(
-        ["Esplora dataset", "Analizza immagine", "Risultati Fase 3"]
+    explorer, analyzer, explainability, results = st.tabs(
+        ["Esplora dataset", "Analizza immagine", "Spiegabilita'", "Risultati Fase 3"]
     )
     with explorer:
         render_explorer(master, significant)
     with analyzer:
         render_analyzer(master, significant)
+    with explainability:
+        render_explainability(master)
     with results:
         render_results(separability)
 
