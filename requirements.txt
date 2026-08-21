@@ -37,6 +37,9 @@ shap==0.51.0
 
 # === Interfaccia grafica ===
 # Avvio: streamlit run src/gui.py
+# L'interfaccia usa a runtime anche shap e joblib (sezione Fase 4): carica il
+# modello serializzato e ne spiega le decisioni, quindi quelle due non sono piu'
+# dipendenze della sola pipeline.
 streamlit==1.55.0
 
 # === Utility ===
