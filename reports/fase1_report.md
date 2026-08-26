@@ -112,8 +112,11 @@ grandezza ben documentata per il tessuto linfoide (**10.000–20.000 nuclei/mm²
 | 0.847 µm/px (lettura alternativa) | 4.282 /mm² | troppo rado per un centro germinativo |
 
 Solo un valore regge, ed è lo stesso a cui porta la lettura dell'articolo. Il diametro
-conferma: 4,96 µm misurati che, corretti per la sotto-copertura del Watershed
-(Dice 0,637 rispetto alla Ground Truth), portano a **≈6,2 µm**.
+è coerente ma meno stringente: 4,96 µm misurati che, corretti per la sotto-copertura del
+Watershed (Dice 0,795 rispetto alla Ground Truth), portano a **≈5,6 µm**, appena sotto
+l'intervallo atteso per un linfocita. La correzione è però approssimativa — il Dice non è
+la frazione di area coperta e la segmentazione produce anche falsi positivi — quindi
+l'evidenza che discrimina fra le calibrazioni candidate resta la densità nucleare.
 
 ### 7. Cosa resta incerto
 

@@ -411,9 +411,12 @@ un valore fisicamente impossibile. A 0.847 um/px risulta 4.282 nuclei/mm2, tropp
 per un centro germinativo. A **0.46 um/px** risulta 14.505 nuclei/mm2, in pieno intervallo
 di letteratura.
 
-Il diametro conferma: a 0.46 um/px la misura e 4.96 um, che corretta per la sotto-copertura
-del Watershed (Dice 0.637 rispetto alla Ground Truth, quindi il diametro reale e circa
-1/sqrt(0.637) volte quello misurato) porta a **~6.2 um**, valore atteso per un linfocita.
+Il diametro e coerente ma meno stringente: a 0.46 um/px la misura e 4.96 um, che corretta
+per la sotto-copertura del Watershed (Dice 0.795 rispetto alla Ground Truth, quindi il
+diametro reale e circa 1/sqrt(0.795) volte quello misurato) porta a **~5.6 um**, appena
+sotto l'intervallo atteso per un linfocita. La correzione e approssimativa: il Dice non e
+la frazione di area coperta e la segmentazione produce anche falsi positivi. L'evidenza
+che discrimina fra le calibrazioni candidate resta quella sulla densita nucleare.
 
 **Valore adottato: 0.46 um/px**, esattamente il doppio del precedente.
 Resta una deduzione, non un dato dichiarato: gli autori non pubblicano la scala. Le due
@@ -459,14 +462,16 @@ biomarcatori risultanti sono ora compatibili con la letteratura:
 | Grandezza | Prima (0.23 um/px) | Dopo (0.46 um/px) | Atteso |
 |---|---|---|---|
 | Diametro nucleare equivalente medio | 2,48 um | **5,32 um** | 6-12 um (misura non corretta per la sotto-copertura) |
-| Diametro corretto per Dice 0,637 | 3,11 um | **6,67 um** | 6-12 um |
+| Diametro corretto per Dice 0,795 | 2,78 um | **5,97 um** | 6-12 um (correzione approssimativa) |
 | Densita nucleare (FL / REACTIVE) | ~58.000 /mm2 | **14.049 / 15.476 /mm2** | 10.000-20.000 /mm2 |
 | Lato del campo visivo | 51,5 um | **103,0 um** | — |
 | Frazione di area nucleare | 0,313 | 0,313 (invariata) | fisiologica |
 
-Il diametro corretto per la sotto-copertura del Watershed (6,67 um) e la densita nucleare
-di entrambe le classi cadono ora dentro gli intervalli di letteratura, mentre con la
-calibrazione precedente erano rispettivamente troppo piccolo e fisicamente impossibile.
+La densita nucleare di entrambe le classi cade ora dentro l'intervallo di letteratura,
+mentre con la calibrazione precedente era fisicamente impossibile. Il diametro corretto
+per la sotto-copertura del Watershed (5,97 um) si colloca appena sotto l'intervallo
+atteso: la correzione 1/sqrt(Dice) e un'approssimazione grossolana, e l'evidenza che
+discrimina fra le calibrazioni candidate resta la densita nucleare.
 La frazione di area nucleare, che non dipende dalla calibrazione, e ovviamente invariata:
 serve da controllo che la correzione non abbia alterato i dati sottostanti.
 

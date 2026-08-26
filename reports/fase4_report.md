@@ -175,6 +175,8 @@ Le medie sono quasi identiche — ed è tutto ciò che un test di Mann-Whitney c
 
 È esattamente ciò che mostra il profilo SHAP per quintili ($+0.52$, $-0.64$, $-0.83$, $-0.15$, $+0.56$): una **forma a U**, con valori estremi in *entrambe* le direzioni che spingono verso il linfoma. Un effetto di questo tipo è invisibile a un confronto fra tendenze centrali.
 
+**La forma a U è leggibile anche nella figura riassuntiva** (`img/fase4/shap_summary.png`): nella riga di `solidity_mean` i punti ad alto valore compaiono su *entrambi* i lati dello zero, mentre in `lbp_entropy` e `hchannel_mean` valori alti e valori bassi si separano nettamente ai due lati. È un indizio visivo e non una misura — l'evidenza quantitativa resta il profilo per quintili — ma rende quella figura utilizzabile in tesi per **mostrare** l'effetto di dispersione, e non soltanto per ordinare le importanze.
+
 Non è sovradattamento: l'importanza permutazionale **fuori-piega** la colloca al 4° posto ($+0.0137$ di AUC) e la magnitudine SHAP fuori-piega ($0.632$) coincide con quella in-sample ($0.656$).
 
 **Interpretazione clinica:** il pleomorfismo nucleare — l'eterogeneità di forma — è un tratto classico del linfoma. Il modello multivariato ha rilevato un effetto di *dispersione* che l'analisi univariata della Fase 3, costruita sul confronto fra medie, non poteva vedere. È un argomento a favore dell'approccio, non un'incoerenza.
