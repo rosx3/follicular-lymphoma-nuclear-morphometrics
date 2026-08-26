@@ -33,8 +33,12 @@ la possono validare:
     letteratura per il tessuto linfoide (10.000-20.000/mm2). Con la
     calibrazione precedente risultava ~58.000/mm2, fisicamente impossibile.
   - Diametro nucleare medio: risulta ~4.96 um misurato, che corretto per la
-    sotto-copertura del Watershed (Dice 0.637 rispetto alla Ground Truth)
-    porta a ~6.2 um, valore atteso per un nucleo linfocitario.
+    sotto-copertura del Watershed (Dice 0.795 rispetto alla Ground Truth)
+    porta a ~5.6 um, appena sotto l'intervallo 6-12 um atteso per un nucleo
+    linfocitario. La correzione 1/sqrt(Dice) e' pero' approssimativa — il Dice
+    non e' la frazione di area coperta e la segmentazione produce anche falsi
+    positivi — quindi questo controllo e' corroborativo: quello che discrimina
+    fra le calibrazioni candidate e' la densita' nucleare.
 
 AVVERTENZA
 ----------

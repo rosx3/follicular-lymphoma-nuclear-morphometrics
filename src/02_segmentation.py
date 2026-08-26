@@ -147,8 +147,8 @@ def segment_nuclei_watershed(
 
       "relative_threshold" (DEFAULT, v3.0/v4.0/v4.2): soglia globale
         `distance.max() * peak_threshold_rel`. È il metodo validato contro la
-        Ground Truth indipendente Cellpose v4.x (Dice 0.6373, AJI 0.3097,
-        F1 0.4101 su n=10 patch) e il migliore dei due su questo dataset.
+        Ground Truth indipendente Cellpose v4.x (Dice 0.7950, AJI 0.5411,
+        F1 0.7108 su n=10 patch) e il migliore dei due su questo dataset.
 
       "h_maxima" (v4.1, NON default): trasformata h-maxima (Vincent, 1993)
         applicata alla distance map. Il parametro h_maxima_px è una soglia di
