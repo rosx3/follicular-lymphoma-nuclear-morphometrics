@@ -13,7 +13,11 @@
 
 La **Fase 2 (Segmentazione dei Nuclei ed Estrazione Centroidi)** è stata completata su tutte le 600 immagini H&E del dataset.
 
-La pipeline adotta come metodo operativo principale un algoritmo d'istanza deterministico (**Marker-Controlled Distance-Transform Watershed**) applicato al canale H-channel deconvoluto (*Ruifrok & Johnston, 2001; Macenko et al., 2009*). Come metodo di confronto accademico è stata implementata una rete neurale convoluzionale **U-Net con backbone ResNet-34** (*Ronneberger et al., 2015; Sung et al., 2024*), sviluppata in PyTorch.
+La pipeline adotta un algoritmo d'istanza deterministico, il **Marker-Controlled Distance-Transform Watershed**, applicato al canale Ematossilina deconvoluto (*Ruifrok & Johnston, 2001; Macenko et al., 2009*). Non è una scelta di ripiego. Lo schema deconvoluzione più watershed marker-controlled più rigetto morfologico è un metodo consolidato per i nuclei in istologia H&E (*Malpica et al., 1997; Veta et al., 2013*), ed è l'unico praticabile qui: il dataset non contiene annotazioni e non è disponibile un patologo, quindi un segmentatore addestrato sul dominio non sarebbe addestrabile.
+
+La qualità della segmentazione è misurata contro una **Ground Truth indipendente generata da Cellpose** (*Stringer et al., 2021*), modello generalista pre-addestrato che non richiede annotazioni (§3). Quel riferimento è a sua volta **verificato contro un conteggio umano** su tutte le patch di validazione (§3.3).
+
+> **Nota storica.** Fino al 2 settembre 2026 questa fase includeva anche una U-Net ResNet-34 come termine di confronto. È stata rimossa dai risultati: era addestrata sulle maschere prodotte dal Watershed stesso, quindi ne imitava il comportamento invece di costituire un metodo indipendente, e la separazione delle istanze del suo output era comunque affidata al Watershed. Il confronto non opponeva due paradigmi, ma due rilevatori di primo piano a valle della stessa macchina. Le sezioni 6.1, 7.7 e 7.8 la citano ancora, come storia del progetto.
 
 ---
 
@@ -26,7 +30,7 @@ La pipeline adotta come metodo operativo principale un algoritmo d'istanza deter
 | **Linfoma Follicolare (FL)** | **44.749 nuclei** (media: $149.2$ nuclei/patch) | Densità tumorale (*Carreras, 2023*) |
 | **Tessuto Reattivo (REACTIVE)** | **49.293 nuclei** (media: $164.3$ nuclei/patch) | Iperplasia follicolare (*Xerri et al., 2016*) |
 | **Master CSV Centroidi** | `data/fase2_segmentation/centroids_all.csv` | 94.042 righe con coord $(x, y)$ px e $\mu m$, area |
-| **Pesi U-Net ResNet-34** | `data/fase2_segmentation/unet_resnet34_weights.pth` | PyTorch Weights |
+| *Pesi U-Net ResNet-34* | `data/fase2_segmentation/unet_resnet34_weights.pth` | *artefatto storico, non usato: vedi la nota in §1* |
 
 ---
 
@@ -49,24 +53,56 @@ Per garantire il massimo rigore scientifico ed evitare la circolarità della val
 
 *Run del 20 agosto 2026 — [`segmentation_benchmark_v4_cellpose_gt.csv`](file:///c:/Users/Master/Desktop/testNuovoTesi/data/fase2_segmentation/segmentation_benchmark_v4_cellpose_gt.csv), GT in `data/ground_truth/cellpose_v4/`.*
 
-| Modello di Segmentazione | Dice (Pixel) | IoU (Pixel) | AJI (Instance) | F1 Detection @0.5 |
-| :--- | :---: | :---: | :---: | :---: |
-| **Marker-Controlled Watershed Zero-Shot** | $0.7950 \pm 0.0442$ | $0.6620 \pm 0.0598$ | **$0.5411 \pm 0.0730$** | $0.7108 \pm 0.0718$ |
-| **PyTorch U-Net (ResNet-34 Backbone)** | **$0.8038 \pm 0.0427$** | **$0.6740 \pm 0.0585$** | $0.5370 \pm 0.0593$ | **$0.7164 \pm 0.0509$** |
+| Metrica | Marker-Controlled Watershed Zero-Shot |
+| :--- | :---: |
+| Dice (pixel) | $0.7950 \pm 0.0442$ |
+| IoU (pixel) | $0.6620 \pm 0.0598$ |
+| AJI (istanza) | $0.5411 \pm 0.0730$ |
+| F1 Detection @0.5 | $0.7108 \pm 0.0718$ |
 
-**Le differenze non sono statisticamente distinguibili.** Test di Wilcoxon appaiato sulle stesse 10 patch: Dice $p=0.193$ (Watershed vince in 4 patch su 10), AJI $p=0.652$ (5/10), F1 detection $p=0.922$ (5/10). Il grassetto segnala il valore più alto, non un vantaggio dimostrato.
+I valori misurano l'**accordo** con Cellpose, non una prestazione assoluta: Cellpose definisce il riferimento e non riceve a sua volta un punteggio. §3.3 verifica quanto quel riferimento sia affidabile.
 
-**Detection.** Ground Truth Cellpose $196.9$ nuclei/patch in media; Watershed $167.5$ ($85\%$), U-Net $157.8$ ($80\%$). Entrambi sotto-rilevano rispetto a Cellpose, il Watershed un po' meno.
+**Detection.** Ground Truth Cellpose $196.9$ nuclei/patch in media, Watershed $167.5$ ($85\%$).
 
-#### Breakdown per Classe Istologica (Watershed vs U-Net):
-- **Linfoma Follicolare (FL):**
-  - *Watershed:* Dice $0.8119$, AJI $0.5697$, F1 Detection $0.7420$
-  - *U-Net ResNet-34:* Dice $0.8172$, AJI $0.5499$, F1 Detection $0.7238$
-- **Tessuto Reattivo (REACTIVE):**
-  - *Watershed:* Dice $0.7781$, AJI $0.5126$, F1 Detection $0.6797$
-  - *U-Net ResNet-34:* Dice $0.7903$, AJI $0.5241$, F1 Detection $0.7090$
+⚠️ *Revisione del 2 settembre 2026.* Fino a questa versione la riga proseguiva con «entrambi sotto-rilevano rispetto a Cellpose». La verifica umana della Sezione 3.3 mostra che **quella lettura era sbagliata**: il Watershed non vede meno oggetti di un lettore umano, ne conta praticamente lo stesso numero. Il divario con Cellpose non nasce da nuclei mancati, ma dalla **fusione di nuclei addossati**, compensata da oggetti segmentati altrove. Vedi §3.3.
+
+#### Breakdown per Classe Istologica
+- **Linfoma Follicolare (FL):** Dice $0.8119$, AJI $0.5697$, F1 Detection $0.7420$
+- **Tessuto Reattivo (REACTIVE):** Dice $0.7781$, AJI $0.5126$, F1 Detection $0.6797$
 
 Il vantaggio d'istanza del Watershed si concentra nelle patch FL (AJI $0.5697$ vs $0.5499$, F1 $0.7420$ vs $0.7238$) e si inverte nel tessuto reattivo. Con $n=5$ per classe si tratta di un'indicazione, non di un risultato.
+
+---
+
+### 3.3 Verifica Umana del Riferimento (2 settembre 2026)
+
+Tutta la validazione di questa fase misura il Watershed contro Cellpose. Restava però una domanda senza risposta: **Cellpose fa un buon lavoro su queste immagini?** Un riferimento mai verificato non è un riferimento, è un'assunzione.
+
+**Metodo.** Un lettore umano ha marcato con un punto il centro di ogni nucleo, alla cieca, su tutte e 10 le patch di validazione, cioè esattamente quelle da cui provengono i numeri di §3.2. In totale **1656 nuclei**, più 64 casi dichiarati dubbi ($3{,}9\%$). L'accoppiamento con le maschere è per contenimento: un nucleo umano è coperto se il suo punto cade dentro un'istanza segmentata. Protocollo completo in `data/annotazione_manuale/README.md`, analisi riproducibile con `python src/annotation_agreement.py`.
+
+**Limiti dichiarati del riferimento umano.** Il lettore **non è un patologo**: in questo lavoro non ne è disponibile alcuno. Il riferimento è quindi non esperto, e non costituisce una ground truth clinica. Inoltre i nuclei pallidi sono stati esclusi di proposito, quindi il conteggio umano è un **limite inferiore**: conta i nuclei ben visibili, non tutti i nuclei presenti. Ne segue che si riportano soltanto le grandezze calcolate sui punti marcati, che non dipendono da quella soglia. Il numero di istanze prive di punto umano è deliberatamente escluso, perché mescolerebbe nuclei pallidi esclusi con eventuali falsi positivi senza distinguerli.
+
+**Risultati.**
+
+| | Watershed | Cellpose |
+|---|:---:|:---:|
+| Nuclei umani coperti | $1456/1656 = 87{,}9\%$ | $1577/1656 = \mathbf{95{,}2\%}$ |
+| Recall medio per immagine | $0.8784$ $[0.8492,\ 0.9076]$ | $\mathbf{0.9491}$ $[0.9247,\ 0.9734]$ |
+| Fusioni di nuclei distinti | $\mathbf{83}$ | $2$ |
+| Immagini con almeno una fusione | $\mathbf{10/10}$ | $2/10$ |
+| Nuclei umani assorbiti in istanze fuse | $\mathbf{170\ (10{,}3\%)}$ | $4\ (0{,}2\%)$ |
+
+Confronti appaiati su $n=10$ immagini: Cellpose ha recall superiore in $10$ immagini su $10$ ($p = 0.002$), e il Watershed produce più fusioni in $10$ su $10$ ($p = 0.002$). Con dieci coppie il $p$ minimo ottenibile da un Wilcoxon a due code è $2/2^{10} = 0.002$: entrambi i confronti lo raggiungono, cioè tutte le immagini concordano.
+
+**Tre conclusioni.**
+
+1. **Il riferimento regge.** Cellpose copre il $95\%$ dei nuclei che un lettore umano riconosce con sicurezza e non fonde quasi mai. Il rischio che la validazione poggiasse su un metro inaffidabile non si è materializzato. È la giustificazione, verificata e non assunta, dell'impianto di §3.2.
+
+2. **Il limite del Watershed è la separazione, non la rilevazione.** Ottantatré fusioni, presenti in tutte e dieci le immagini, coinvolgono il $10{,}3\%$ dei nuclei marcati. È coerente con la natura dell'algoritmo: il watershed marker-controlled separa gli oggetti in base ai massimi della mappa di distanza, e nuclei addossati con un'unica cresta di distanza restano un oggetto solo.
+
+3. **Il conteggio complessivo nasconde l'errore.** Il rapporto fra istanze del Watershed e nuclei umani ha mediana $1.001$: sui totali i due numeri coincidono. Ma l'accordo è apparente, perché nasce da due errori di verso opposto che si compensano, nuclei fusi da un lato e oggetti aggiunti dall'altro. **Un confronto basato sui soli conteggi avrebbe concluso per un accordo perfetto.** È la ragione per cui la verifica è stata fatta marcando le posizioni e non contando.
+
+Figure per immagine in `img/fase2/annotazione/`, dati in `data/annotazione_manuale/accordo_umano.csv` e `accordo_umano_sintesi.csv`.
 
 ---
 
@@ -76,18 +112,25 @@ Dall'analisi quantitativa e metodologica della Fase 2 si traggono tre **conclusi
 
 ### 🎓 Conclusioni da Inserire nella Tesi:
 
-1. **Un Algoritmo Zero-Shot Eguaglia una Rete Addestrata sul Dominio:**
-   Il **Marker-Controlled Watershed applicato al canale H deconvoluto con Macenko** ottiene prestazioni **statisticamente indistinguibili** da una U-Net ResNet-34 addestrata sulle patch del dataset: Dice $0.7950$ vs $0.8038$ ($p=0.193$), AJI $0.5411$ vs $0.5370$ ($p=0.652$), F1 detection $0.7108$ vs $0.7164$ ($p=0.922$), con vittorie ripartite 4/10 e 5/10 sulle singole patch.
-   *Perché è un risultato e non un pareggio banale:* il Watershed raggiunge quel livello **senza alcun addestramento, senza dati etichettati e in modo deterministico** — la stessa immagine dà sempre la stessa maschera, mentre la U-Net va riaddestrata e mostra varianza run-to-run (Sezione 7.7.5). La decomposizione in Densità Ottica isola la cromaticità dell'ematossilina in modo analitico e privo di bias di addestramento: è il *costo* del secondo metodo, non la sua accuratezza, a fare la differenza.
-   ⚠️ *Formulazione corretta per la tesi:* **non** rivendicare superiorità del Watershed. Con $n=10$ patch e un solo seed di addestramento i dati non la sostengono, e la formulazione precedente ("supera la U-Net") si fondava su un benchmark che misurava parametri di segmentazione diversi da quelli del dataset (Sezione 7.8). La rivendicazione difendibile è la parità a costo nullo.
+1. **Un Metodo Deterministico, Scelto per Vincolo e Sostenuto dalla Letteratura:**
+   La segmentazione adotta un algoritmo senza addestramento. Non è una rinuncia al deep learning: è l'unica opzione disponibile, perché il dataset non contiene annotazioni e non è disponibile un patologo che possa produrle. Un segmentatore supervisionato richiederebbe proprio ciò che manca.
+   Lo schema adottato, deconvoluzione cromatica seguita da watershed marker-controlled e rigetto morfologico, è documentato per i nuclei in istologia H&E: *Malpica et al. (1997)* ne stabilisce l'uso sui nuclei addossati, *Veta et al. (2013)* ne descrive la variante quasi identica alla nostra, sviluppata su 21 casi di carcinoma mammario e validata su 18 indipendenti.
+   *Il vantaggio da rivendicare è il costo, non l'accuratezza:* il metodo è deterministico, la stessa immagine dà sempre la stessa maschera, non richiede etichette e non ha varianza fra esecuzioni.
+   ⚠️ *Formulazione da evitare in tesi:* qualunque rivendicazione di superiorità su metodi profondi. Il confronto con la U-Net presente fino al 2 settembre 2026 è stato rimosso perché non opponeva due paradigmi (§1, nota storica), e il §3.3 mostra che contro un lettore umano il Watershed ha un limite reale, la fusione dei nuclei addossati.
 
 2. **Risoluzione Rigorosa della Circolarità della Validazione:**
    L'uso di una Ground Truth generata da un modello esterno super partes (Cellpose v4.x, *Stringer et al., 2021*) ricalibrato alla dimensione dei nuclei linfocitari ($d = 22.0\text{ px} \approx 10.1\,\mu m$) ha permesso di eliminare il bias di autovalutazione.  
-   L'accordo di Dice del $79.5\%$ e l'AJI di $0.5411$ tra Watershed e Cellpose riflettono la fisiologica differenza tra modellazione gradient-flow (Cellpose) e linee di cresta della distance map (Watershed), rientrando negli intervalli di concordanza riportati in patologia digitale per segmentatori automatici indipendenti (*Kumar et al., 2017*).
+   L'accordo misurato fra Watershed e Cellpose è di $0.795$ di Dice e $0.5411$ di AJI. I due algoritmi seguono principi diversi, modellazione gradient-flow il primo, linee di cresta della distance map il secondo, e un accordo parziale è quindi atteso.
+
+   ⚠️ *Correzione del 2 settembre 2026.* Fino a questa revisione la frase proseguiva affermando che quei valori «rientrano negli intervalli di concordanza riportati in patologia digitale per segmentatori automatici indipendenti», con rimando a *Kumar et al. (2017)*. **La citazione non sostiene l'affermazione.** Kumar et al. misurano le prestazioni di metodi automatici contro annotazioni manuali, cioè contro una ground truth vera, mentre qui si tratta di accordo fra due automatismi entrambi fallibili: sono grandezze diverse. Inoltre i valori di AJI dei metodi consolidati sul benchmark MoNuSeg si collocano intorno a $0.61$-$0.64$, quindi sopra il nostro, e nemmeno quello sarebbe un confronto pulito, trattandosi di dataset multi-organo con annotazioni manuali contro tessuto linfoide con riferimento automatico.
+
+   Una ricerca bibliografica mirata non ha individuato una fonte che stabilisca quali siano gli intervalli di concordanza attesi **fra segmentatori automatici indipendenti** in patologia digitale. In assenza di un termine di paragone pubblicato, i valori sono riportati per quello che sono, senza rivendicare che siano normali o attesi.
+
+   Il riferimento non resta però un'assunzione: la Sezione 3.3 lo verifica contro un conteggio umano su tutte e 10 le patch di validazione, e Cellpose vi copre il $95{,}2\%$ dei nuclei riconosciuti dal lettore. È questo, e non un intervallo di letteratura, a sostenere l'uso di Cellpose come metro.
    La Ground Truth di questo run è **conservata** in `data/ground_truth/cellpose_v4/` (10 maschere, PNG 16-bit): a differenza dei run precedenti, le metriche qui riportate sono ricalcolabili da chiunque.
 
 3. **Maggiore F1-Detection nel Linfoma Follicolare (FL):**
-   Sia il Watershed ($F1 = 0.7420$ su FL contro $0.6797$ su REACTIVE) che la U-Net ($0.7238$ contro $0.7090$) ottengono prestazioni superiori nelle patch FL. Questo è coerente con l'ipotesi patologica che l'impaccamento e l'ipercromasia dei nuclei linfomatosi forniscano un contrasto di gradiente più netto nel canale Ematossilina rispetto al tessuto reattivo. Il divario è però netto solo per il Watershed ($+0.062$) e marginale per la U-Net ($+0.015$), e poggia su $n=5$ patch per classe: va presentato come indicazione.
+   Il Watershed ottiene prestazioni superiori nelle patch FL: $F1 = 0.7420$ contro $0.6797$ su REACTIVE, cioè $+0.062$. È coerente con l'ipotesi patologica che l'impaccamento e l'ipercromasia dei nuclei linfomatosi forniscano un contrasto di gradiente più netto nel canale Ematossilina rispetto al tessuto reattivo. Poggia però su $n=5$ patch per classe: va presentato come indicazione, non come risultato.
 
 ---
 
@@ -144,8 +187,9 @@ dataset della tesi smette di essere riproducibile e il test lo segnala.
 9. **Carreras J.** (2023). *The pathobiology of follicular lymphoma*. **Journal of Clinical and Experimental Hematopathology (JCEH)**, 63(3), 152-163. DOI: 10.3960/jslrt.23023.
 10. **Ronneberger O, Fischer P, Brox T.** (2015). *U-Net: Convolutional Networks for Biomedical Image Segmentation*. **MICCAI 2015**, LNCS 9351, pp. 234-241.
 11. **Vincent L.** (1993). *Morphological grayscale reconstruction in image analysis: applications and efficient algorithms*. **IEEE Transactions on Image Processing**, 2(2), 176-201. DOI: 10.1109/83.217222. *(Fondamento della trasformata h-maxima usata in v4.1, Sezione 7)*
-12. **Veta M, van Diest PJ, Kornegoor R, Huisman A, Viergever MA, Pluim JPW.** (2013). *Automatic Nuclei Segmentation in H&E Stained Breast Cancer Histopathology Images*. **PLoS ONE**, 8(7), e70221. DOI: 10.1371/journal.pone.0070221. *(Motivazione empirica del limite del threshold globale singolo su nuclei di dimensione eterogenea)*
+12. **Veta M, van Diest PJ, Kornegoor R, Huisman A, Viergever MA, Pluim JPW.** (2013). *Automatic Nuclei Segmentation in H&E Stained Breast Cancer Histopathology Images*. **PLoS ONE**, 8(7), e70221. DOI: 10.1371/journal.pone.0070221. *(**Il precedente metodologico più vicino**: color unmixing, watershed marker-controlled, rigetto morfologico delle regioni false, cioè lo stesso schema adottato qui. Sviluppato su 21 casi e validato su 18 indipendenti. Sostiene la conclusione 1 di §4. Motiva inoltre il limite del threshold globale singolo su nuclei di dimensione eterogenea, §7)*
 13. **Koyuncu CF, Arslan S, Durmaz I, Cetin-Atalay R, Gunduz-Demir C.** (2016). *Iterative h-minima-based marker-controlled watershed for cell nucleus segmentation*. **Cytometry Part A**, 89(4), 338-349. DOI: 10.1002/cyto.a.22824. *(Approccio iterativo h-minima come possibile ulteriore raffinamento futuro, Sezione 7.6)*
+14. **Malpica N, Ortiz de Solórzano C, Vaquero JJ, Santos A, Vallcorba I, García-Sagredo JM, del Pozo F.** (1997). *Applying watershed algorithms to the segmentation of clustered nuclei*. **Cytometry**, 28(4), 289-297. DOI: 10.1002/(SICI)1097-0320(19970801)28:4&lt;289::AID-CYTO3&gt;3.0.CO;2-7. *(Lavoro fondativo sull'uso del watershed morfologico per i nuclei addossati, con circa il 90% di cluster correttamente segmentati. Stabilisce che il metodo adottato in questa fase non è un ripiego ma un approccio consolidato: conclusione 1 di §4)*
 
 ---
 
@@ -158,7 +202,9 @@ dataset della tesi smette di essere riproducibile e il test lo segnala.
 
 ---
 
-## 6.1 Analisi del Data Leakage nello Split Train/Val della U-Net
+## 6.1 Analisi del Data Leakage nello Split Train/Val della U-Net *(sezione storica, non più applicabile)*
+
+> ⚠️ **Questa sezione non descrive più il lavoro.** La U-Net è stata rimossa dai risultati il 2 settembre 2026 (§1, nota storica), e con essa lo split 20/10 che questa analisi discute. Il contenuto resta come storia del progetto e come documentazione di un problema che era stato individuato e valutato. **Non va portato in tesi fra i risultati**, al più citato in una riga della metodologia insieme alla ragione della rimozione.
 
 ### Descrizione del Problema
 
@@ -184,7 +230,7 @@ Restano però due ragioni strutturali per cui il disegno dell'esperimento sfavor
 
 Da qui la lettura corretta del pareggio. Una rete addestrata sulle maschere del Watershed non riesce ad andare oltre il proprio maestro in modo misurabile. La rivendicazione difendibile resta quella della Sezione 4: parità a costo nullo, non superiorità di nessuno dei due.
 
-### Dichiarazione da Inserire nella Tesi (Sezione Limitazioni)
+### Dichiarazione che era destinata alla tesi *(superata: la U-Net non fa più parte del lavoro)*
 
 > *"Lo split train/val per la rete U-Net ResNet-34 è stato eseguito a livello di patch (20 train / 10 val). In un dataset con patch estratte da WSI dello stesso paziente, questo approccio potrebbe introdurre un data leakage che inflazionerebbe le metriche di validazione. Nel presente lavoro tale rischio è mitigato dal fatto che ciascuna immagine nel dataset Zenodo [DOI: 10.5281/zenodo.15702609] costituisce una patch anatomicamente indipendente proveniente da acquisizioni distinte. La valutazione definitiva delle due metodologie è stata condotta tramite un benchmark indipendente su GPU (Cellpose v4.x, Stringer et al., 2021), privo di qualsiasi forma di circolarità o leakage."*
 
@@ -297,7 +343,7 @@ Il risultato negativo **non invalida** la diagnosi tecnica di Sezione 7.2-7.3, c
 
 Questa distinzione è utile in tesi: la vulnerabilità documentata resta una **limitazione dichiarata** del metodo adottato, rilevante qualora il lavoro venisse esteso a WSI o a dataset con eterogeneità dimensionale maggiore, dove il trade-off potrebbe invertirsi.
 
-### 7.7.5 Nota sulla Correzione dell'AJI (FIX A) e sulla Varianza della U-Net
+### 7.7.5 Nota sulla Correzione dell'AJI (FIX A) e sulla Varianza della U-Net *(la parte sulla U-Net è storica)*
 
 Due osservazioni emerse dal confronto tra questo run e quello di Sezione 3.2, **sulle stesse 10 patch**:
 

@@ -179,7 +179,7 @@ correttamente etichettate come tali.
 
 **Data:** 2 settembre 2026
 **Stato risposta:** chiarita
-**Stato azione:** 3A fatta, 3B da fare
+**Stato azione:** 3A e 3B fatte, 3C e 3D da fare
 
 ### Risposta verificata
 
@@ -434,6 +434,171 @@ Wilcoxon appaiato è 0.0625 e nessuna differenza può risultare significativa a
 0.05. Due strade: `GroupKFold` ripetuto su più partizionamenti, oppure
 leave-one-block-out, che con circa 60 blocchi darebbe 60 stime invece di 5.
 Con la tabella per piega ora conservata, il calcolo a valle è già pronto.
+
+---
+
+## 5. «Perché una sola metrica? E non è confrontabile con la letteratura»
+
+**Data:** 2 settembre 2026
+**Stato risposta:** chiarita
+**Stato azione:** fatta
+
+### Risposta verificata
+
+Le metriche calcolate erano quattro, non una: AUC, accuratezza bilanciata,
+sensibilità e specificità, per piega, in `metrics_by_model.csv`. Ma il report ne
+mostrava una sola, e sensibilità e specificità non comparivano in nessuna
+tabella. Sulla presentazione l'osservazione era quindi fondata.
+
+L'AUC era in prima fila per una ragione mai scritta: la soglia decisionale è
+ferma a 0,5 e deliberatamente non tarata (limitazione 4). L'AUC non dipende dalla
+soglia, accuratezza, precisione e F1 sì. Metterle in testa avrebbe penalizzato il
+modello per una soglia che si è scelto di non ottimizzare. Ora la ragione è nel
+report.
+
+### Cosa è stato fatto (2 settembre 2026)
+
+**Pannello in `_fold_metrics()`.** AUC, accuratezza, accuratezza bilanciata,
+precisione, richiamo, specificità, F1, false negative rate e false positive rate.
+Aggiunto lì perché è il punto da cui passano tutte le tabelle prodotte da
+`evaluate()`: metriche per modello, sensibilità alla dimensione del blocco e
+contributo per famiglia lo ereditano senza altri interventi.
+
+Set scelto dall'utente sulla base dei lavori citati (AUC, accuratezza,
+precisione, richiamo, F1), più due aggiunte motivate:
+
+- **specificità**, perché delle cinque solo il richiamo non dipende dalla
+  prevalenza, e sensibilità con specificità è l'unica coppia che si trasferisce
+  fra popolazioni con prevalenze diverse;
+- **false negative rate**, chiesto dal relatore. È $1 -$ richiamo, quindi non
+  aggiunge informazione: aggiunge la lettura clinica corretta.
+
+Scartate PR-AUC (utile solo a classi sbilanciate), MCC (segue l'accuratezza a
+classi bilanciate), valore predittivo negativo (raddoppia la riserva sulla
+prevalenza senza aggiungere nulla) e Brier score (misura la calibrazione, non la
+discriminazione: serve solo se la probabilità mostrata dalla GUI entra nella
+tesi).
+
+**Fase 4 rieseguita per intero.** Tutti i numeri già pubblicati invariati al
+quarto decimale. 218 test passati, due nuovi: uno fissa le identità che devono
+valere esattamente (FNR = 1 − sensibilità, FPR = 1 − specificità, F1 media
+armonica), l'altro fissa l'ipotesi delle pieghe bilanciate sotto cui accuratezza
+e accuratezza bilanciata coincidono.
+
+**§3.4 riscritta** come pannello completo con intervalli di confidenza, più la
+lettura clinica. **§3.6 «Confronto con lo stato dell'arte»** aggiunta, che il
+relatore aveva chiesto: un lavoro per riga con tecnica, dati e metrica riportata
+col proprio nome, senza conversioni. De Souza et al. (2026) aggiunto in
+bibliografia come voce 16.
+
+### Il numero che ne è uscito
+
+Il modello non riconosce circa il **18% dei linfomi** (FNR 0,1767, intervallo da
+0,063 a 0,291). È la stessa prestazione di «AUC 0,9401» letta dal lato che conta
+in diagnostica. E l'errore cade dal lato sbagliato: specificità 0,90 contro
+sensibilità 0,82, quindi alla soglia di 0,5 il modello manca un linfoma più
+spesso di quanto dia un falso allarme.
+
+**Questione aperta.** Spostare il punto di lavoro sulla ROC ridurrebbe il FNR a
+scapito della specificità. Sceglierlo guardando questi risultati sarebbe però lo
+stesso ottimismo che la doppia validazione serve a evitare. Da decidere: se
+riportare un punto alternativo dichiarandolo illustrativo e non validato, oppure
+lasciare solo 0,5.
+
+### Nota di metodo emersa qui
+
+Il relatore aveva suggerito di appoggiare la limitazione 7 al fatto che De Souza,
+validando all'esterno, scende da 95,7% a 80,5% e 69,0%. **Scartato su richiesta
+dell'utente:** giustificare ciò che non si è potuto fare dicendo che ad altri è
+andata peggio non è un argomento. In §3.6 resta il dato fattuale, cioè che loro
+la validazione esterna l'hanno fatta e questa tesi no.
+
+---
+
+## 6. Verifica umana del riferimento, e rimozione della U-Net
+
+**Data:** 2 settembre 2026
+**Stato:** fatta
+
+### Da dove è nata
+
+Rispondendo alla domanda sui blocchi contigui è emerso, verificando il codice,
+che il confronto Watershed contro U-Net non opponeva due paradigmi:
+
+- la U-Net era addestrata sulle maschere prodotte dal Watershed stesso
+  (`scratch/run_colab_benchmark.py:155`), quindi ne imitava il comportamento;
+- il suo output binario veniva comunque separato in istanze **dal Watershed**
+  (riga 231), con gli stessi parametri.
+
+Il Watershed girava quindi dentro entrambi i bracci, e il confronto misurava
+solo due rilevatori di primo piano a valle della stessa macchina.
+
+### Annotazione manuale (1656 nuclei)
+
+Restava aperta una domanda più grossa: Cellpose, che fa da metro a tutta la
+Fase 2, non era mai stato verificato su queste immagini.
+
+Sono state annotate a mano, alla cieca, tutte e 10 le patch di validazione:
+**1656 nuclei**, 64 dubbi (3,9%), circa 10 minuti a immagine. Protocollo in
+`data/annotazione_manuale/README.md`, analisi in `src/annotation_agreement.py`.
+
+| | Watershed | Cellpose |
+|---|:---:|:---:|
+| Nuclei umani coperti | 87,9% | **95,2%** |
+| Fusioni di nuclei distinti | **83** | 2 |
+| Immagini con almeno una fusione | **10/10** | 2/10 |
+| Nuclei assorbiti in istanze fuse | **170 (10,3%)** | 4 (0,2%) |
+
+Confronti appaiati su n = 10: Cellpose vince in 10 immagini su 10 su entrambe le
+grandezze, p = 0,002, il minimo ottenibile.
+
+**Tre conclusioni.** Il riferimento regge, quindi l'impianto di validazione è
+salvo. Il limite del Watershed non è la rilevazione ma la separazione. E il
+conteggio complessivo del Watershed coincide con quello umano (rapporto mediano
+1,001) solo perché due errori opposti si compensano: un confronto sui soli
+conteggi avrebbe concluso per un accordo perfetto.
+
+**Limiti dichiarati.** Il lettore non è un patologo, e non ne esiste uno nel
+progetto: il riferimento è non esperto. I nuclei pallidi sono stati esclusi, quindi
+il conteggio umano è un limite inferiore, e per questo si riportano solo recall e
+fusioni, che non dipendono da quella soglia.
+
+### Cosa è stato modificato
+
+**U-Net rimossa** da sintesi, tabella dei risultati, breakdown per classe e
+conclusioni della Fase 2, e da tutto il README. Le sezioni 6.1, 7.7 e 7.8 la
+citano ancora ma sono marcate come storiche. La classe `UNetResNet34` resta nel
+codice con un'intestazione che spiega perché non è usata.
+
+**Conclusione 1 riscritta:** non più «un algoritmo zero-shot eguaglia una rete
+addestrata», ma la scelta di un metodo deterministico per vincolo (nessuna
+annotazione disponibile) sostenuta da Malpica (1997) e Veta (2013), quest'ultimo
+descrive uno schema quasi identico al nostro. Aggiunto Malpica in bibliografia
+con DOI verificato.
+
+**Nuova §3.3 in Fase 2** con metodo, limiti, risultati e conclusioni.
+**Limitazione 5 della Fase 4 riscritta**: non più «popolazione nucleare
+incompleta» ma «nuclei fusi», con la conseguenza sui biomarcatori morfometrici.
+
+**Matrici di confusione aggiunte** (§3.4 di Fase 4), per tutti i modelli e
+entrambe le validazioni, più la figura. Verificato che le metriche derivate
+coincidano con le medie per piega: scarto nullo, perché le pieghe hanno tutte
+120 patch.
+
+### Conseguenze sulla lista
+
+Le voci **1, 2A e 2B si chiudono senza lavoro**: riguardavano lo split
+train/val, che esisteva solo per addestrare la U-Net. Senza rete non serve
+nessuno split.
+
+**Non resta più niente che richieda la GPU.**
+
+### Rimane aperto
+
+L'effetto delle fusioni sui biomarcatori non è quantificato. Il 10,3% dei nuclei
+è coinvolto, e una fusione non è un nucleo perso: è un oggetto con area doppia e
+forma alterata, che entra nelle feature morfometriche. Dichiarato nella
+limitazione 5, non misurato.
 
 ---
 

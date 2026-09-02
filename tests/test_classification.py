@@ -489,6 +489,54 @@ def test_contribution_uses_the_same_folds_for_every_subset(clf, dataset):
     )
 
 
+def test_confusion_matrix_reconstructs_the_panel_metrics(clf):
+    """
+    La matrice e il pannello devono raccontare la stessa cosa.
+
+    Sono due viste degli stessi conteggi: se le metriche ricavate dalla matrice
+    non coincidessero con quelle di `_fold_metrics`, il report conterrebbe due
+    numeri diversi per la stessa grandezza, e non ci sarebbe modo di sapere
+    quale credere.
+    """
+    import pandas as pd
+
+    predictions = pd.DataFrame({
+        "validation": ["V"] * 8,
+        "model": ["m"] * 8,
+        "y_true": [1, 1, 1, 1, 0, 0, 0, 0],
+        "y_prob": [0.9, 0.8, 0.7, 0.2, 0.6, 0.3, 0.2, 0.1],
+    })
+
+    matrix = clf.confusion_matrices(predictions).iloc[0]
+    panel = clf._fold_metrics(
+        predictions.y_true.to_numpy(),
+        predictions.y_prob.to_numpy(),
+        (predictions.y_prob.to_numpy() >= 0.5).astype(int),
+    )
+
+    assert matrix.tp + matrix.fn + matrix.fp + matrix.tn == matrix.n_patch
+    assert matrix.accuratezza == pytest.approx(panel["accuracy"])
+    assert matrix.tp / (matrix.tp + matrix.fn) == pytest.approx(panel["sensitivity"])
+    assert matrix.tn / (matrix.tn + matrix.fp) == pytest.approx(panel["specificity"])
+    assert matrix.fn / (matrix.tp + matrix.fn) == pytest.approx(panel["false_negative_rate"])
+
+
+def test_confusion_matrix_covers_every_validation_and_model(clf):
+    import pandas as pd
+
+    predictions = pd.DataFrame({
+        "validation": ["A", "A", "B", "B"] * 2,
+        "model": ["m1"] * 4 + ["m2"] * 4,
+        "y_true": [1, 0] * 4,
+        "y_prob": [0.9, 0.1] * 4,
+    })
+
+    table = clf.confusion_matrices(predictions)
+
+    assert len(table) == 4, "due validazioni per due modelli"
+    assert set(table.n_patch) == {2}
+
+
 def test_fold_metrics_panel_is_internally_consistent(clf):
     """
     Le identita' fra metriche devono valere esattamente, non circa.

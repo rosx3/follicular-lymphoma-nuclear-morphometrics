@@ -1,0 +1,7 @@
+validation,model,soglia,n_patch,tp,fn,fp,tn,accuratezza
+A_casuale,logistic_regression,0.5,600,253,47,44,256,0.8483
+A_casuale,random_forest,0.5,600,257,43,34,266,0.8717
+A_casuale,xgboost,0.5,600,265,35,30,270,0.8917
+B_blocchi,logistic_regression,0.5,600,241,59,45,255,0.8267
+B_blocchi,random_forest,0.5,600,245,55,39,261,0.8433
+B_blocchi,xgboost,0.5,600,247,53,30,270,0.8617

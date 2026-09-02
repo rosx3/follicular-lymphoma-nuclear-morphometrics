@@ -21,7 +21,7 @@ A differenza dei classici approcci "Black-Box" basati su reti neurali convoluzio
             │
             ▼
 ┌─────────────────────────┐
-│  Fase 2: Segmentazione  │ ──► Marker-Controlled Watershed (94.042 nuclei isolati) + U-Net
+│  Fase 2: Segmentazione  │ ──► Marker-Controlled Watershed (94.042 nuclei isolati)
 └───────────┬─────────────┘
             │
             ▼
@@ -53,7 +53,8 @@ testNuovoTesi/
 ├── data/                                  # Dati numerici e output di pipeline
 │   ├── raw/                               # Dataset grezzo di input
 │   ├── fase1_preprocessing/               # Immagini normalizzate Macenko e canali H
-│   ├── ground_truth/                      # 30 patch di validazione benchmark
+│   ├── ground_truth/                      # 30 patch di validazione benchmark + maschere Cellpose
+│   ├── annotazione_manuale/               # ⭐ 1656 nuclei marcati a mano, protocollo e accordo con gli algoritmi
 │   ├── fase2_segmentation/                # Maschere d'istanza (16-bit PNG) e centroidi
 │   │   ├── centroids_all.csv              # CSV Master: 94.042 nuclei con coord (x,y px/µm) e area
 │   │   ├── colab_benchmark_results.csv    # Benchmark quantitativo vs Cellpose GT
@@ -83,15 +84,18 @@ testNuovoTesi/
 │   ├── naming.py                          # Convenzioni di naming, categorie e risoluzione percorsi
 │   ├── calibration.py                     # ⭐ Calibrazione spaziale — unica fonte di verità
 │   ├── 01_preprocessing.py                # Pipeline Macenko + Deconvoluzione H-channel
-│   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3 + U-Net PyTorch
+│   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   ├── feature_analysis.py                # Test di separabilità FL vs REACTIVE e figure
 │   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione, SHAP, contributo per famiglia
 │   ├── stain_robustness.py                # La tessitura legge la cromatina o il vetrino?
+│   ├── block_structure.py                 # L'ordine di numerazione conserva struttura? (premessa della validazione a blocchi)
+│   ├── prepara_annotazione.py             # Esporta le patch per l'annotazione manuale
+│   ├── annotation_agreement.py            # ⭐ Verifica umana del riferimento Cellpose (1656 nuclei)
 │   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
 │   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
 │
-├── tests/                                 # Test automatici (pytest) — 208 test
+├── tests/                                 # Test automatici (pytest) — 220 test
 │   ├── test_calibration.py                # Calibrazione e assenza di duplicazioni
 │   ├── test_naming.py                     # Convenzioni di naming e categorie
 │   ├── test_pipeline_paths.py             # Risoluzione input delle 600 patch
@@ -101,7 +105,7 @@ testNuovoTesi/
 │   ├── test_patch_feature_contract.py     # Contratto delle 50 colonne
 │   ├── test_feature_analysis.py           # Test statistici e correzione FDR
 │   ├── test_feature_figures.py            # Figure per la tesi
-│   ├── test_segmentation_split.py         # Split stratificato train/val
+│   ├── test_block_structure.py            # L'ordine di numerazione conserva struttura?
 │   ├── test_gui_core.py                   # Coerenza GUI ↔ pipeline sui biomarcatori
 │   ├── test_gui.py                        # Interfaccia Streamlit headless (AppTest)
 │   ├── test_gui_e2e.py                    # Interfaccia con browser vero (Playwright)
@@ -128,18 +132,18 @@ testNuovoTesi/
 - **Nuclei Estratti:** **94.042 nuclei totali** registrati nel file `centroids_all.csv`.
 - **Validazione Indipendente su GPU** (Cellpose Oracle GT, $d=22.0\text{ px} \approx 10.1\,\mu m$; $n=10$ patch di validazione, run del 20 agosto 2026):
 
-  | Metrica | Watershed zero-shot | U-Net ResNet-34 | Esito |
-  |---|:---:|:---:|:---:|
-  | Dice (pixel) | $0.7950 \pm 0.0442$ | $0.8038 \pm 0.0427$ | $p = 0.19$ |
-  | IoU (pixel) | $0.6620 \pm 0.0598$ | $0.6740 \pm 0.0585$ | — |
-  | AJI (istanza) | $0.5411 \pm 0.0730$ | $0.5370 \pm 0.0593$ | $p = 0.65$ |
-  | F1 detection @0.5 | $0.7108 \pm 0.0718$ | $0.7164 \pm 0.0509$ | $p = 0.92$ |
+  | Metrica | Accordo Watershed vs Cellpose |
+  |---|:---:|
+  | Dice (pixel) | $0.7950 \pm 0.0442$ |
+  | IoU (pixel) | $0.6620 \pm 0.0598$ |
+  | AJI (istanza) | $0.5411 \pm 0.0730$ |
+  | F1 detection @0.5 | $0.7108 \pm 0.0718$ |
 
-  Test di Wilcoxon appaiato sulle 10 patch; vittorie del Watershed 4/10, 5/10 e 5/10.
+- **Verifica umana del riferimento** (2 settembre 2026): 1656 nuclei marcati a mano, alla cieca, su tutte e 10 le patch di validazione. Cellpose copre il **95,2%** dei nuclei riconosciuti dal lettore, il Watershed l'**87,9%**. Il limite del Watershed non è la rilevazione ma la **fusione dei nuclei addossati**: 83 casi, presenti in 10 immagini su 10, che coinvolgono il 10,3% dei nuclei marcati. Cellpose ne fonde 2 in totale. Confronti appaiati $p = 0.002$, il minimo ottenibile con $n=10$. Dettagli in [`reports/fase2_report.md`](reports/fase2_report.md) §3.3.
 
-- **Risultato Principale:** un algoritmo **deterministico e zero-shot eguaglia una U-Net ResNet-34 addestrata sul dominio**. Le differenze non sono statisticamente distinguibili su nessuna delle tre metriche, e il Watershed raggiunge questo risultato **senza alcun addestramento**, senza dati etichettati e in modo perfettamente riproducibile. Il Watershed recupera l'**85%** dei nuclei della Ground Truth Cellpose (la U-Net l'80%).
+- **Risultato Principale:** il conteggio complessivo del Watershed coincide con quello umano (rapporto mediano $1.001$), ma **l'accordo è apparente**: nasce da due errori di verso opposto che si compensano, nuclei fusi da un lato e oggetti aggiunti dall'altro. Un confronto basato sui soli conteggi avrebbe concluso per un accordo perfetto.
 
-> **Nota storica — perché i numeri sono cambiati.** Fino al 20 agosto 2026 questa sezione riportava Dice $0.6373$ vs $0.5738$ e concludeva per la superiorità del Watershed. Quel benchmark invocava la segmentazione senza parametri espliciti e misurava quindi `min_distance=12, min_area_px=30`, **non** i parametri con cui è stato costruito il dataset (verificato sui conteggi `ws_n_pred`: 10 patch su 10). Corretti i parametri, entrambi i metodi migliorano nettamente — il Watershed +66% di AJI e +73% di F1, la U-Net ancora di più perché era addestrata su quelle stesse maschere — e il vantaggio del Watershed sparisce. Analisi completa in [`reports/fase2_report.md`](reports/fase2_report.md) §7.8.
+> **Nota storica — perché i numeri sono cambiati.** Fino al 20 agosto 2026 questa sezione riportava Dice $0.6373$ vs $0.5738$ e concludeva per la superiorità del Watershed. Quel benchmark invocava la segmentazione senza parametri espliciti e misurava quindi `min_distance=12, min_area_px=30`, **non** i parametri con cui è stato costruito il dataset (verificato sui conteggi `ws_n_pred`: 10 patch su 10). Corretti i parametri, il Watershed migliora nettamente, +66% di AJI e +73% di F1. Analisi completa in [`reports/fase2_report.md`](reports/fase2_report.md) §7.8.
 
 ### Fase 3: Estrazione dei Biomarcatori e Separabilità Statistica
 - **Matrice prodotta:** **600 patch × 50 colonne** (47 biomarcatori + 3 metadati), da 94.042 nuclei. Zero errori, zero valori mancanti.
