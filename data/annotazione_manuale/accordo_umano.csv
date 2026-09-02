@@ -1,0 +1,21 @@
+image_name,category,algoritmo,n_dubbi_umani,n_punti_umani,n_istanze,umani_trovati,umani_persi,istanze_senza_punto,istanze_con_piu_punti,umani_in_istanze_fuse,recall_umano
+FL_examples (108),Follicular Lymphoma,watershed,3,150,134,119,31,22,7,14,0.7933
+FL_examples (108),Follicular Lymphoma,cellpose,3,150,165,132,18,33,0,0,0.88
+FL_examples (15),Follicular Lymphoma,watershed,5,156,157,146,10,25,13,27,0.9359
+FL_examples (15),Follicular Lymphoma,cellpose,5,156,190,148,8,42,0,0,0.9487
+FL_examples (189),Follicular Lymphoma,watershed,9,146,162,134,12,29,1,2,0.9178
+FL_examples (189),Follicular Lymphoma,cellpose,9,146,167,143,3,24,0,0,0.9795
+FL_examples (20),Follicular Lymphoma,watershed,7,207,206,180,27,29,2,5,0.8696
+FL_examples (20),Follicular Lymphoma,cellpose,7,207,291,206,1,85,0,0,0.9952
+FL_examples (217),Follicular Lymphoma,watershed,5,154,139,136,18,15,11,23,0.8831
+FL_examples (217),Follicular Lymphoma,cellpose,5,154,156,137,17,19,0,0,0.8896
+REACTIVE_examples (103),Reactive Tissue,watershed,8,248,227,226,22,17,16,32,0.9113
+REACTIVE_examples (103),Reactive Tissue,cellpose,8,248,322,246,2,76,0,0,0.9919
+REACTIVE_examples (215),Reactive Tissue,watershed,7,104,154,92,12,70,8,16,0.8846
+REACTIVE_examples (215),Reactive Tissue,cellpose,7,104,144,101,3,44,1,2,0.9712
+REACTIVE_examples (233),Reactive Tissue,watershed,5,133,131,119,14,23,10,21,0.8947
+REACTIVE_examples (233),Reactive Tissue,cellpose,5,133,138,126,7,12,0,0,0.9474
+REACTIVE_examples (244),Reactive Tissue,watershed,9,188,193,168,20,32,7,14,0.8936
+REACTIVE_examples (244),Reactive Tissue,cellpose,9,188,206,179,9,27,0,0,0.9521
+REACTIVE_examples (85),Reactive Tissue,watershed,6,170,172,136,34,44,8,16,0.8
+REACTIVE_examples (85),Reactive Tissue,cellpose,6,170,190,159,11,32,1,2,0.9353

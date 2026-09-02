@@ -1,0 +1,91 @@
+{
+  "scopo": "verifica umana del riferimento Cellpose, limitata alla detection",
+  "n_immagini": 10,
+  "patch_size_px": 224,
+  "upscale": 4,
+  "immagine_annotata": "RGB normalizzata (Macenko + denoising), non canale H",
+  "selezione": "tutte le patch con GT Cellpose salvata: nessuna selezione",
+  "avvertenza": "i conteggi di riferimento non compaiono qui di proposito: leggerli prima di annotare orienterebbe l'annotatore",
+  "immagini": [
+    {
+      "image_name": "FL_examples (108)",
+      "category": "Follicular Lymphoma",
+      "file": "FL_examples_108.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "FL_examples (15)",
+      "category": "Follicular Lymphoma",
+      "file": "FL_examples_15.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "FL_examples (189)",
+      "category": "Follicular Lymphoma",
+      "file": "FL_examples_189.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "FL_examples (20)",
+      "category": "Follicular Lymphoma",
+      "file": "FL_examples_20.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "FL_examples (217)",
+      "category": "Follicular Lymphoma",
+      "file": "FL_examples_217.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "REACTIVE_examples (103)",
+      "category": "Reactive Tissue",
+      "file": "REACTIVE_examples_103.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "REACTIVE_examples (215)",
+      "category": "Reactive Tissue",
+      "file": "REACTIVE_examples_215.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "REACTIVE_examples (233)",
+      "category": "Reactive Tissue",
+      "file": "REACTIVE_examples_233.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "REACTIVE_examples (244)",
+      "category": "Reactive Tissue",
+      "file": "REACTIVE_examples_244.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    },
+    {
+      "image_name": "REACTIVE_examples (85)",
+      "category": "Reactive Tissue",
+      "file": "REACTIVE_examples_85.png",
+      "patch_size_px": 224,
+      "upscale": 4,
+      "conversione": "x_patch = x_click / upscale"
+    }
+  ]
+}

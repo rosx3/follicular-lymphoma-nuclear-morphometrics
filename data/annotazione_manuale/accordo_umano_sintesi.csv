@@ -1,0 +1,3 @@
+algoritmo,n_immagini,nuclei_umani,nuclei_coperti,copertura,recall_medio,recall_ic95_inf,recall_ic95_sup,fusioni,immagini_con_fusioni,nuclei_in_fusioni,quota_nuclei_in_fusioni,recall_umano_peggio_in,recall_umano_p,istanze_con_piu_punti_peggio_in,istanze_con_piu_punti_p
+watershed,10,1656,1456,0.8792,0.8784,0.8492,0.9076,83,10,170,0.1027,10.0,0.002,10.0,0.002
+cellpose,10,1656,1577,0.9523,0.9491,0.9247,0.9734,2,2,4,0.0024,,,,

@@ -268,9 +268,19 @@ def segment_nuclei_watershed(
 
 # ---------------------------------------------------------------------------
 # 2. Architettura PyTorch U-Net (ResNet-34 Backbone)
-#    RUOLO: strumento di confronto accademico con il Watershed zero-shot.
-#    NON è usata per la produzione delle maschere delle 600 immagini del dataset.
-#    La pipeline operativa (Step 2.1) usa esclusivamente segment_nuclei_watershed().
+#
+#    ⚠️ CODICE STORICO, NON USATO (dal 2 settembre 2026).
+#    Serviva come termine di confronto accademico con il Watershed. E' stata
+#    rimossa dai risultati della tesi per due ragioni, entrambe documentate in
+#    reports/fase2_report.md §1:
+#      - era addestrata sulle maschere prodotte dal Watershed stesso, quindi ne
+#        imitava il comportamento invece di essere un metodo indipendente;
+#      - il suo output binario veniva comunque separato in istanze DAL WATERSHED,
+#        quindi il confronto non opponeva due paradigmi ma due rilevatori di
+#        primo piano a valle della stessa macchina.
+#    Non e' mai stata usata per produrre le maschere delle 600 immagini: quelle
+#    vengono solo da segment_nuclei_watershed(). Il codice resta per storia e
+#    perche' rimuoverlo non porterebbe alcun beneficio.
 # ---------------------------------------------------------------------------
 class ConvBlock(nn.Module):
     """Blocco conv-BN-ReLU-conv-BN-ReLU con Dropout2d opzionale."""

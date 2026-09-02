@@ -409,6 +409,47 @@ def _fold_metrics(y_true: np.ndarray, y_prob: np.ndarray, y_pred: np.ndarray) ->
     }
 
 
+def confusion_matrices(predictions: pd.DataFrame, threshold: float = 0.5) -> pd.DataFrame:
+    """
+    Matrice di confusione per modello e validazione, dalle predizioni fuori-piega.
+
+    PERCHE' RIPORTARLA. E' il materiale grezzo da cui derivano tutte le metriche
+    del pannello: chi legge puo' ricalcolarsele invece di fidarsi, e non restano
+    grandezze nascoste. In piu' rende concreto il numero che conta in diagnostica:
+    "53 linfomi su 300 classificati come reattivi" dice piu' di "FNR 0.177".
+
+    AGGREGAZIONE. Le predizioni sono fuori-piega, quindi ogni patch compare una
+    volta sola e la matrice complessiva e' la somma di quelle per piega. Poiche'
+    le pieghe hanno tutte la stessa numerosita', le metriche derivate da questa
+    matrice coincidono con la media di quelle per piega riportate altrove: la
+    verifica sull'accuratezza da' scarto nullo al quarto decimale su tutti e sei
+    i casi. Con pieghe di dimensione diversa le due aggregazioni divergerebbero,
+    e andrebbe dichiarato quale si sta riportando.
+
+    Classe positiva: linfoma follicolare.
+    """
+    records = []
+    for (validation, model), group in predictions.groupby(["validation", "model"], sort=False):
+        truth = group["y_true"].to_numpy(dtype=int)
+        predicted = (group["y_prob"].to_numpy(dtype=float) >= threshold).astype(int)
+        records.append({
+            "validation": validation,
+            "model": model,
+            "soglia": threshold,
+            "n_patch": int(len(group)),
+            # veri positivi = linfomi riconosciuti; falsi negativi = linfomi
+            # scambiati per tessuto reattivo, cioe' l'errore clinicamente costoso
+            "tp": int(((predicted == 1) & (truth == 1)).sum()),
+            "fn": int(((predicted == 0) & (truth == 1)).sum()),
+            "fp": int(((predicted == 1) & (truth == 0)).sum()),
+            "tn": int(((predicted == 0) & (truth == 0)).sum()),
+        })
+
+    table = pd.DataFrame(records)
+    table["accuratezza"] = ((table.tp + table.tn) / table.n_patch).round(4)
+    return table
+
+
 def evaluate(
     X: np.ndarray,
     y: np.ndarray,
@@ -843,6 +884,48 @@ def _plot_roc(predictions: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
+def _plot_confusion(predictions: pd.DataFrame, path: Path, model: str = "xgboost") -> None:
+    """
+    Matrici di confusione del modello scelto, una per validazione.
+
+    Le due affiancate mostrano la forbice in unita' di pazienti invece che di
+    AUC: quanti linfomi in piu' sfuggono quando si smette di mostrare al modello
+    altre patch degli stessi vetrini.
+    """
+    import matplotlib.pyplot as plt
+
+    table = confusion_matrices(predictions)
+    table = table[table.model == model]
+    if table.empty:
+        return
+
+    figure, axes = plt.subplots(1, len(table), figsize=(5.2 * len(table), 4.6))
+    axes = np.atleast_1d(axes)
+
+    for axis, (_, row) in zip(axes, table.iterrows()):
+        counts = np.array([[row.tp, row.fn], [row.fp, row.tn]])
+        axis.imshow(counts, cmap="Blues", vmin=0, vmax=counts.max())
+        for i in range(2):
+            for j in range(2):
+                axis.text(
+                    j, i, f"{counts[i, j]}", ha="center", va="center", fontsize=20,
+                    color="white" if counts[i, j] > counts.max() * 0.6 else "#1a1a1a",
+                    fontweight="bold" if (i, j) == (0, 1) else "normal",
+                )
+        axis.set_xticks([0, 1], ["predetto\nlinfoma", "predetto\nreattivo"])
+        axis.set_yticks([0, 1], ["linfoma\nreale", "reattivo\nreale"])
+        axis.set_title(f"{row.validation} — accuratezza {row.accuratezza:.4f}", fontsize=11)
+
+    figure.suptitle(
+        f"Matrici di confusione fuori-piega, {model}, soglia 0.5\n"
+        "in grassetto i falsi negativi: linfomi classificati come tessuto reattivo",
+        fontsize=12,
+    )
+    figure.tight_layout()
+    figure.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(figure)
+
+
 def _plot_validation_gap(metrics: pd.DataFrame, path: Path) -> None:
     """La forbice: quanto del punteggio spariva passando ai blocchi."""
     import matplotlib.pyplot as plt
@@ -966,6 +1049,8 @@ def main() -> None:
     predictions["image_name"] = predictions["row"].map(dict(enumerate(data.image_names)))
     predictions["block"] = predictions["row"].map(dict(enumerate(groups)))
     predictions.to_csv(OUTPUT_DIR / "out_of_fold_predictions.csv", index=False)
+    confusion_matrices(predictions).to_csv(OUTPUT_DIR / "confusion_matrices.csv", index=False)
+    _plot_confusion(predictions, IMG_DIR / "confusion_matrices.png")
 
     print("[Fase 4] Contributo per famiglia di biomarcatori...")
     contribution = feature_family_contribution(

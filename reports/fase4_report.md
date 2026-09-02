@@ -157,6 +157,32 @@ Nella validazione A, per confronto, XGBoost dà AUC $0.9648$ $[0.9534,\ 0.9762]$
 
 **Solo due voci si trasferiscono ad altre popolazioni.** Accuratezza, precisione e F1 dipendono dalla prevalenza, che qui è del $50\%$ per costruzione. Sensibilità e specificità non ne dipendono. Sono quelle due, con l'AUC, le grandezze su cui un confronto con la letteratura regge senza correzioni.
 
+#### Le matrici di confusione
+
+Il pannello si ricava per intero da quattro conteggi. Riportarli significa che ogni metrica è ricalcolabile da chi legge, e che non restano grandezze nascoste. Le predizioni sono fuori-piega, quindi ogni patch compare una volta sola e la matrice complessiva è la somma di quelle per piega.
+
+**XGBoost, validazione a blocchi** (600 patch, soglia $0{,}5$):
+
+| | Predetto FL | Predetto reattivo |
+|---|:---:|:---:|
+| **FL reale** | $247$ | $\mathbf{53}$ |
+| **Reattivo reale** | $30$ | $270$ |
+
+Tutti e tre i modelli, entrambe le validazioni:
+
+| Validazione | Modello | TP | FN | FP | TN | Accuratezza |
+|---|---|:---:|:---:|:---:|:---:|:---:|
+| A casuale | Logistica | $253$ | $47$ | $44$ | $256$ | $0.8483$ |
+| A casuale | Random Forest | $257$ | $43$ | $34$ | $266$ | $0.8717$ |
+| A casuale | XGBoost | $265$ | $35$ | $30$ | $270$ | $0.8917$ |
+| **B blocchi** | Logistica | $241$ | $59$ | $45$ | $255$ | $0.8267$ |
+| **B blocchi** | Random Forest | $245$ | $55$ | $39$ | $261$ | $0.8433$ |
+| **B blocchi** | **XGBoost** | $\mathbf{247}$ | $\mathbf{53}$ | $\mathbf{30}$ | $\mathbf{270}$ | $\mathbf{0.8617}$ |
+
+*Nota sull'aggregazione.* Le metriche derivate da queste matrici coincidono con le medie per piega della tabella precedente, scarto nullo al quarto decimale su tutti e sei i casi, perché le pieghe hanno tutte la stessa numerosità ($120$ patch). Con pieghe di dimensione diversa le due aggregazioni divergerebbero e andrebbe dichiarato quale si riporta.
+
+**La forbice, letta in pazienti invece che in AUC.** Su XGBoost i falsi negativi passano da $35$ con lo split casuale a $53$ con quello a blocchi. Sono **18 linfomi in più che sfuggono su 300**, e sono la stessa cosa che il $+0.0247$ di AUC di §3.1 descrive in modo più astratto. Artefatti: `confusion_matrices.csv`, `img/fase4/confusion_matrices.png`.
+
 #### Il numero che conta clinicamente
 
 **Il modello non riconosce circa il 18% dei linfomi follicolari**, con un intervallo che arriva al $29\%$. È la stessa prestazione descritta da «AUC $0{,}9401$», letta dal lato che conta in diagnostica: il falso negativo è un linfoma scambiato per tessuto reattivo, cioè una diagnosi mancata, mentre il falso positivo porta a un approfondimento.
@@ -513,7 +539,9 @@ dataset non permette.
 
 4. **Soglia non ottimizzata.** La soglia decisionale resta a $0{,}5$ e non è stata scelta sui dati: ottimizzarla sul test sarebbe un'altra forma dello stesso errore che la fase intende misurare. Sensibilità e specificità a soglie diverse si leggono sulla curva ROC.
 
-5. **Eredità dalla Fase 2.** I biomarcatori sono calcolati su una popolazione nucleare incompleta: la segmentazione recupera l'$85\%$ dei nuclei rilevati da Cellpose (Fase 2, §3.2). L'incompletezza è sistematica, non casuale, e potrebbe interagire con le feature di densità e distanza.
+5. **Eredità dalla Fase 2: nuclei fusi, non nuclei mancanti.** I biomarcatori sono calcolati su una popolazione nucleare imperfetta, e la verifica umana di Fase 2, §3.3 ne ha chiarito la natura. Il Watershed copre l'$87{,}9\%$ dei nuclei che un lettore umano riconosce, ma il problema principale non è la rilevazione: è la **fusione di nuclei addossati**, 83 casi su 10 patch, che assorbe il $10{,}3\%$ dei nuclei marcati.
+
+   La conseguenza sui biomarcatori è diversa da quella di una semplice perdita, e va dichiarata. Due nuclei fusi in uno producono un oggetto con area circa doppia, contorno irregolare e quindi solidità e circolarità alterate. L'effetto si propaga alle feature morfometriche (`area_um2_mean`, `solidity_*`, `circularity_*`) e a quelle di densità (`n_nuclei`), non solo ai conteggi. **L'entità di questo effetto non è stata quantificata**, e resta la principale questione aperta lasciata da questo lavoro.
 
 6. **Blocchi difficili non spiegati.** I cinque blocchi con più errori stanno agli estremi della numerazione FL. Senza etichette di caso non è possibile stabilire se corrispondano a casi clinici particolari, a una diversa preparazione dei vetrini o ad altro.
 
@@ -541,6 +569,7 @@ Seed $42$ ovunque; versioni fissate in `requirements.txt`. Artefatti prodotti:
 | `feature_reduction.csv` | le 47 feature con gruppo, esito e rappresentante |
 | `shap_importance.csv` | importanza, direzione e profilo per quintili |
 | `out_of_fold_predictions.csv` | probabilità fuori-piega, per l'analisi degli errori |
+| `confusion_matrices.csv` | TP, FN, FP, TN per modello e validazione, da cui il pannello è ricalcolabile |
 | `best_model.joblib` | XGBoost riaddestrato su tutti i dati, con l'elenco delle feature |
 | `contribution_by_family.csv` | AUC **per piega** per sottoinsieme di biomarcatori e per modello |
 | `contribution_by_family_summary.csv` | media e deviazione standard delle stesse, per la tabella di §4.4 |
