@@ -418,9 +418,9 @@ def test_shap_declares_a_direction_only_when_the_effect_is_monotone(clf, dataset
 
 
 # --------------------------------------------------------------------------
-# Ablazione per famiglia di biomarcatori
+# Contributo per famiglia di biomarcatori
 # --------------------------------------------------------------------------
-def test_ablation_reports_every_family(clf, dataset):
+def test_contribution_reports_every_family(clf, dataset):
     from sklearn.model_selection import GroupKFold  # noqa: F401
 
     subset = np.r_[0:60, 300:360]
@@ -428,7 +428,7 @@ def test_ablation_reports_every_family(clf, dataset):
     groups = np.array(clf.contiguous_blocks(names, block_size=5))
     models = {"logistic_regression": clf.build_models(seed=42)["logistic_regression"]}
 
-    table = clf.feature_family_ablation(
+    table = clf.feature_family_contribution(
         dataset.X[subset], dataset.y[subset], list(dataset.feature_names),
         models, groups, seed=42, n_splits=3,
     )
@@ -437,10 +437,127 @@ def test_ablation_reports_every_family(clf, dataset):
         "tutte", "senza intensita'", "senza tessitura",
         "solo morfometria e spaziale", "solo tessitura e intensita'",
     }
-    assert table["auc_roc_medio"].between(0.0, 1.0).all()
+    assert table["auc_roc"].between(0.0, 1.0).all()
+
+    summary = clf.summarise_contribution(table)
+    assert len(summary) == 5, "un modello per cinque sottoinsiemi"
+    assert summary["auc_roc_medio"].between(0.0, 1.0).all()
 
 
-def test_ablation_subsets_are_complementary(clf, dataset):
+def test_contribution_keeps_the_per_fold_scores(clf, dataset):
+    """
+    Le AUC per piega devono sopravvivere all'aggregazione.
+
+    Senza di esse il confronto appaiato fra sottoinsiemi non e' ricalcolabile
+    dagli artefatti salvati, ed e' il solo confronto lecito: i sottoinsiemi
+    condividono le stesse pieghe.
+    """
+    subset = np.r_[0:60, 300:360]
+    names = [dataset.image_names[i] for i in subset]
+    groups = np.array(clf.contiguous_blocks(names, block_size=5))
+    models = {"logistic_regression": clf.build_models(seed=42)["logistic_regression"]}
+
+    table = clf.feature_family_contribution(
+        dataset.X[subset], dataset.y[subset], list(dataset.feature_names),
+        models, groups, seed=42, n_splits=3,
+    )
+
+    assert {"fold", "auc_roc"} <= set(table.columns)
+    assert len(table) == 5 * 3, "cinque sottoinsiemi per tre pieghe"
+
+
+def test_contribution_uses_the_same_folds_for_every_subset(clf, dataset):
+    """
+    L'appaiamento regge solo se la piega k contiene le stesse patch in ogni
+    sottoinsieme. GroupKFold e' deterministico e i gruppi non cambiano, quindi
+    deve essere cosi': se smettesse di esserlo, un test appaiato confronterebbe
+    stime calcolate su insiemi diversi.
+    """
+    subset = np.r_[0:60, 300:360]
+    names = [dataset.image_names[i] for i in subset]
+    groups = np.array(clf.contiguous_blocks(names, block_size=5))
+    models = {"logistic_regression": clf.build_models(seed=42)["logistic_regression"]}
+
+    table = clf.feature_family_contribution(
+        dataset.X[subset], dataset.y[subset], list(dataset.feature_names),
+        models, groups, seed=42, n_splits=3,
+    )
+
+    sizes = table.pivot_table(index="fold", columns="sottoinsieme", values="n_test")
+    assert (sizes.nunique(axis=1) == 1).all(), (
+        "la stessa piega ha numerosita' diverse fra sottoinsiemi: non sono appaiati"
+    )
+
+
+def test_fold_metrics_panel_is_internally_consistent(clf):
+    """
+    Le identita' fra metriche devono valere esattamente, non circa.
+
+    FNR = 1 - sensibilita', FPR = 1 - specificita', e F1 e' la media armonica di
+    precisione e richiamo. Sono ridondanze volute: servono alla lettura clinica.
+    Se una di esse smettesse di valere, il pannello conterrebbe due numeri che
+    dicono cose diverse sotto nomi che promettono la stessa.
+    """
+    y_true = np.array([1, 1, 1, 1, 0, 0, 0, 0])
+    y_prob = np.array([0.9, 0.8, 0.7, 0.2, 0.6, 0.3, 0.2, 0.1])
+    y_pred = (y_prob >= 0.5).astype(int)
+
+    m = clf._fold_metrics(y_true, y_prob, y_pred)
+
+    assert m["sensitivity"] == pytest.approx(3 / 4)
+    assert m["specificity"] == pytest.approx(3 / 4)
+    assert m["precision"] == pytest.approx(3 / 4)
+    assert m["accuracy"] == pytest.approx(6 / 8)
+    assert m["false_negative_rate"] == pytest.approx(1 - m["sensitivity"])
+    assert m["false_positive_rate"] == pytest.approx(1 - m["specificity"])
+    harmonic = 2 * m["precision"] * m["sensitivity"] / (m["precision"] + m["sensitivity"])
+    assert m["f1"] == pytest.approx(harmonic)
+
+
+def test_accuracy_and_balanced_accuracy_agree_on_balanced_folds(clf):
+    """
+    Con classi bilanciate le due coincidono, e il report ne cita una sola.
+
+    Se le pieghe si sbilanciassero smetterebbero di coincidere: il test fissa
+    l'ipotesi sotto cui l'equivalenza vale, cosi' che rompendola qualcosa lo
+    segnali.
+    """
+    y_true = np.array([1, 1, 1, 1, 0, 0, 0, 0])
+    y_prob = np.array([0.9, 0.8, 0.7, 0.2, 0.6, 0.3, 0.2, 0.1])
+
+    m = clf._fold_metrics(y_true, y_prob, (y_prob >= 0.5).astype(int))
+
+    assert m["accuracy"] == pytest.approx(m["balanced_accuracy"])
+
+
+def test_paired_tests_never_claim_unreachable_significance(clf, dataset):
+    """
+    Con poche pieghe il Wilcoxon appaiato non puo' scendere sotto una soglia.
+
+    Con k pieghe le combinazioni di segno sono 2^k, quindi il p minimo a due code
+    vale 2/2^k: con 5 pieghe e' 0.0625, sopra 0.05. Il test presidia che nessun
+    valore riportato scenda sotto quel limite, perche' sarebbe un errore di
+    calcolo, e che il limite sia dichiarato nella tabella accanto al p.
+    """
+    subset = np.r_[0:60, 300:360]
+    names = [dataset.image_names[i] for i in subset]
+    groups = np.array(clf.contiguous_blocks(names, block_size=5))
+    models = {"logistic_regression": clf.build_models(seed=42)["logistic_regression"]}
+
+    per_fold = clf.feature_family_contribution(
+        dataset.X[subset], dataset.y[subset], list(dataset.feature_names),
+        models, groups, seed=42, n_splits=3,
+    )
+    paired = clf.paired_family_tests(per_fold)
+
+    assert len(paired) == len(clf.FAMILY_COMPARISONS)
+    assert (paired["n_pieghe"] == 3).all()
+    assert (paired["p_minimo_ottenibile"] == 0.25).all(), "2 / 2^3"
+    assert (paired["p_wilcoxon"] >= paired["p_minimo_ottenibile"]).all()
+    assert (paired["vittorie_a"] <= paired["n_pieghe"]).all()
+
+
+def test_contribution_subsets_are_complementary(clf, dataset):
     """
     'solo morfometria' e 'solo tessitura' devono partizionare le feature: se si
     sovrapponessero o lasciassero fuori qualcosa, il confronto fra famiglie non
