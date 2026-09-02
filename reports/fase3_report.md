@@ -271,6 +271,23 @@ piu di qualunque descrittore di forma o dimensione. Questo giustifica a posterio
 decisione D2 di calcolarla sui soli pixel nucleari: e proprio il segnale che il
 mascheramento serviva a isolare.
 
+*Conferma indipendente (aggiunta settembre 2026).* Ryu et al. (2026,
+doi:10.1002/dc.70183) misurano 14 parametri nucleari di forma, dimensione e intensita
+su preparati citologici di 12 linfomi follicolari di grado 1-2 e 17 controlli non
+neoplastici, dei quali 10 iperplasie follicolari reattive. Dei quattro parametri
+risultati discriminanti, due riguardano la dimensione (area e perimetro) e uno e la
+deviazione standard calcolata **sui pixel** del nucleo, cioe la variabilita del segnale
+interno al nucleo. E la stessa grandezza che qui domina sotto forma di entropia LBP,
+misurata pero su sezioni istologiche anziche su citologia. Il quarto parametro e un
+coefficiente di variazione, di cui l'abstract non specifica se riferito all'intensita
+o a una grandezza di forma: da verificare sul testo integrale prima di usarlo nel
+confronto.
+
+La convergenza vale come corroborazione esterna del segnale, non delle prestazioni:
+Ryu si ferma al confronto statistico fra gruppi e non costruisce un classificatore,
+quindi non e un termine di paragone per l'AUC. Va tenuta presente per la sezione
+"Confronto con lo stato dell'arte" del capitolo dei risultati.
+
 **2. La scelta del test sui dati era necessaria.**
 45 feature su 47 hanno richiesto Mann-Whitney: solo `eccentricity_cv` ed
 `eccentricity_std` superano il test di normalita in entrambi i gruppi. Imporre il t-test di Welch

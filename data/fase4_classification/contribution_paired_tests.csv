@@ -1,0 +1,13 @@
+model,sottoinsieme_a,sottoinsieme_b,diff_media,vittorie_a,n_pieghe,p_wilcoxon,p_minimo_ottenibile
+logistic_regression,solo tessitura e intensita',solo morfometria e spaziale,0.1257,4,5,0.125,0.0625
+logistic_regression,solo tessitura e intensita',tutte,-0.0078,1,5,0.4375,0.0625
+logistic_regression,tutte,senza tessitura,0.1142,5,5,0.0625,0.0625
+logistic_regression,tutte,senza intensita',-0.0018,2,5,1.0,0.0625
+random_forest,solo tessitura e intensita',solo morfometria e spaziale,0.0849,4,5,0.125,0.0625
+random_forest,solo tessitura e intensita',tutte,0.009,4,5,0.4375,0.0625
+random_forest,tutte,senza tessitura,0.0605,5,5,0.0625,0.0625
+random_forest,tutte,senza intensita',0.0108,5,5,0.0625,0.0625
+xgboost,solo tessitura e intensita',solo morfometria e spaziale,0.0867,4,5,0.125,0.0625
+xgboost,solo tessitura e intensita',tutte,0.0038,3,5,0.8125,0.0625
+xgboost,tutte,senza tessitura,0.0713,4,5,0.125,0.0625
+xgboost,tutte,senza intensita',0.017,5,5,0.0625,0.0625

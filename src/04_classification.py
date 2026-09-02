@@ -28,6 +28,8 @@ IL PROBLEMA CENTRALE — perche' ci sono due validazioni e non una.
   adiacente distano nello spazio dei biomarcatori 0.615x (FL) e 0.691x
   (REACTIVE) rispetto a coppie qualsiasi. L'ordine di numerazione conserva una
   struttura a blocchi compatibile con l'esportazione caso per caso.
+  La verifica e' riproducibile: `python src/block_structure.py` la rifa' da capo,
+  test di permutazione compreso, e scrive block_structure_evidence.csv.
 
   Ogni modello viene percio' valutato DUE volte, stessi dati e stesso codice,
   cambiando solo lo splitter: casuale (ottimistico) e a blocchi contigui
@@ -352,17 +354,58 @@ def build_models(seed: int = 42) -> dict[str, ModelSpec]:
 # D4/D5 — valutazione con taratura annidata
 # ---------------------------------------------------------------------------
 def _fold_metrics(y_true: np.ndarray, y_prob: np.ndarray, y_pred: np.ndarray) -> dict:
-    """AUC-ROC, accuratezza bilanciata, sensibilita' e specificita'."""
+    """
+    Pannello di metriche di una piega. Classe positiva: linfoma follicolare.
+
+    PERCHE' PIU' DI UNA. I lavori di riferimento non riportano la stessa
+    grandezza: Carreras et al. (2025) e De Souza et al. (2026) danno
+    l'accuratezza, Sung et al. (2024) l'area sotto la curva. Senza un pannello
+    non esiste una voce su cui il confronto sia diretto, e convertire una metrica
+    in un'altra non e' lecito.
+
+    QUALE LEGGERE PER PRIMA. L'AUC resta la metrica principale perche' non
+    dipende dalla soglia, e la soglia qui e' ferma a 0.5 e deliberatamente NON
+    tarata (report §7, limitazione 4). Accuratezza, precisione e F1 dipendono
+    tutte dalla soglia, e vanno lette sapendolo.
+
+    QUALI SI TRASFERISCONO. Accuratezza, precisione e F1 dipendono anche dalla
+    prevalenza: qui e' 50% per costruzione, altrove no. Sensibilita' e
+    specificita' non ne dipendono, e sono percio' le uniche due grandezze su cui
+    il confronto con la letteratura regge senza correzioni.
+
+    FALSE NEGATIVE RATE. E' 1 - sensibilita', quindi non aggiunge informazione:
+    aggiunge la lettura clinica corretta. In questa diagnosi differenziale il
+    falso negativo e' un linfoma scambiato per tessuto reattivo, cioe' l'errore
+    costoso. Va guardato prima dell'AUC.
+    """
     from sklearn.metrics import balanced_accuracy_score, confusion_matrix, roc_auc_score
 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    sensitivity = float(tp / (tp + fn)) if (tp + fn) else float("nan")
+    specificity = float(tn / (tn + fp)) if (tn + fp) else float("nan")
+    precision = float(tp / (tp + fp)) if (tp + fp) else float("nan")
+    f1_denominator = precision + sensitivity
+
     return {
         "auc_roc": float(roc_auc_score(y_true, y_prob)),
+        "accuracy": float((tp + tn) / len(y_true)),
+        # Con pieghe bilanciate coincide con l'accuratezza. Si conserva perche'
+        # smetterebbe di coincidere se le pieghe si sbilanciassero, e in quel
+        # caso la divergenza va vista, non nascosta.
         "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+        "precision": precision,
         # Sensibilita': quanti linfomi vengono riconosciuti. Specificita': quanti
         # tessuti reattivi non vengono scambiati per linfoma.
-        "sensitivity": float(tp / (tp + fn)) if (tp + fn) else float("nan"),
-        "specificity": float(tn / (tn + fp)) if (tn + fp) else float("nan"),
+        "sensitivity": sensitivity,
+        "specificity": specificity,
+        "f1": (
+            float(2 * precision * sensitivity / f1_denominator)
+            if f1_denominator else float("nan")
+        ),
+        # Complementi espliciti: ridondanti per definizione, ma sono la forma in
+        # cui la letteratura clinica li riporta e in cui vanno discussi.
+        "false_negative_rate": 1.0 - sensitivity,
+        "false_positive_rate": 1.0 - specificity,
     }
 
 
@@ -470,7 +513,7 @@ def evaluate(
     return (metrics, pd.concat(predictions, ignore_index=True)) if return_predictions else metrics
 
 
-# Le due famiglie di biomarcatori messe a confronto dall'ablazione. La prima
+# Le due famiglie di biomarcatori messe a confronto dall'analisi di contributo. La prima
 # descrive intensita' e tessitura del segnale, la seconda la geometria dei nuclei
 # e la loro disposizione.
 TEXTURE_AND_INTENSITY = (
@@ -479,7 +522,7 @@ TEXTURE_AND_INTENSITY = (
 )
 
 
-def feature_family_ablation(
+def feature_family_contribution(
     X: np.ndarray,
     y: np.ndarray,
     feature_names: list[str],
@@ -492,13 +535,21 @@ def feature_family_ablation(
     Quanto pesa ciascuna famiglia di biomarcatori sul risultato.
 
     La tesi e' costruita sull'idea di biomarcatori morfometrici e spaziali, ma la
-    classifica SHAP mette in testa tessitura e intensita'. L'ablazione dice
-    quanto di quel risultato regge senza l'una o senza l'altra famiglia — ed e'
-    un dato che va in tesi, non una curiosita': se la morfometria da sola vale
-    molto meno del totale, la narrazione va aggiustata di conseguenza.
+    classifica SHAP mette in testa tessitura e intensita'. Rimuovere una famiglia
+    e rimisurare dice quanto di quel risultato regge senza di essa. E' un dato che
+    va in tesi, non una curiosita': se la morfometria da sola vale molto meno del
+    totale, la narrazione va aggiustata di conseguenza.
 
     Si valuta sempre con lo splitter CONSERVATIVO: confrontare famiglie sulla
     stima ottimistica premierebbe quella che sfrutta meglio il leakage.
+
+    ATTENZIONE ALL'INTERPRETAZIONE. La misura e' INTERNA: dice quale famiglia
+    porta il segnale in QUESTO dataset, non che lo porterebbe altrove. Genera
+    un'ipotesi, non la conferma: la conferma richiederebbe una coorte
+    indipendente, che qui non esiste (report §7, limitazione 7). Inoltre le 5
+    pieghe non bastano a un test appaiato: il minimo p ottenibile da un Wilcoxon
+    su 5 coppie e' 0.0625, quindi nessuna differenza fra sottoinsiemi puo' essere
+    dichiarata significativa con questo disegno.
     """
     from sklearn.model_selection import GroupKFold
 
@@ -515,24 +566,102 @@ def feature_family_ablation(
                                         if f in TEXTURE_AND_INTENSITY],
     }
 
-    records = []
+    tables = []
     for label, subset in families.items():
         if not subset:
             continue
         columns = [feature_names.index(f) for f in subset]
-        metrics = evaluate(
+        table = evaluate(
             X[:, columns], y, models, GroupKFold(n_splits=n_splits),
-            validation=f"ablazione: {label}", seed=seed, groups=groups,
+            validation=f"contributo: {label}", seed=seed, groups=groups,
         )
-        for model in metrics["model"].unique():
-            scores = metrics.loc[metrics.model == model, "auc_roc"]
+        table["sottoinsieme"] = label
+        table["n_biomarcatori"] = len(subset)
+        tables.append(table)
+
+    return pd.concat(tables, ignore_index=True)
+
+
+def summarise_contribution(per_fold: pd.DataFrame) -> pd.DataFrame:
+    """
+    Media e dispersione dell'AUC per sottoinsieme e modello.
+
+    E' la tabella che finisce nel report. La deviazione standard usa ddof=0
+    (deviazione della popolazione delle 5 pieghe, non stima campionaria): non e'
+    una scelta di comodo, e' quella con cui sono stati prodotti i numeri gia'
+    pubblicati, e cambiarla li farebbe divergere al terzo decimale senza che
+    nulla sia cambiato nei dati.
+    """
+    grouped = per_fold.groupby(["sottoinsieme", "n_biomarcatori", "model"], sort=False)
+    summary = grouped["auc_roc"].agg(
+        auc_roc_medio="mean",
+        auc_roc_std=lambda scores: float(scores.std(ddof=0)),
+    )
+    return summary.reset_index()
+
+
+#: Confronti fra sottoinsiemi che rispondono a una domanda della tesi. Fissati
+#: qui e non scelti dopo aver visto i risultati: sceglierli a posteriori sarebbe
+#: un test multiplo mascherato.
+FAMILY_COMPARISONS = (
+    ("solo tessitura e intensita'", "solo morfometria e spaziale"),
+    ("solo tessitura e intensita'", "tutte"),
+    ("tutte", "senza tessitura"),
+    ("tutte", "senza intensita'"),
+)
+
+
+def paired_family_tests(per_fold: pd.DataFrame) -> pd.DataFrame:
+    """
+    Confronto appaiato fra sottoinsiemi, piega per piega.
+
+    PERCHE' APPAIATO. I sottoinsiemi condividono le stesse pieghe: GroupKFold e'
+    deterministico e i gruppi non cambiano fra un sottoinsieme e l'altro. La
+    piega k contiene percio' le stesse patch ovunque, e le differenze si possono
+    accoppiare.
+
+    COME SI LEGGE, E COSA NON SI PUO' LEGGERE. Con 5 pieghe le combinazioni di
+    segno sono 2^5 = 32: il valore p minimo di un Wilcoxon appaiato a due code e'
+    quindi 0.0625, e NESSUNA differenza puo' risultare significativa a 0.05. Un
+    p pari a 0.0625 non va letto come "quasi significativo": va letto come "tutte
+    e cinque le pieghe concordano", che e' il massimo di evidenza che questo
+    disegno puo' produrre. La colonna `vittorie` e' percio' piu' informativa del
+    valore p, e va riportata insieme a esso.
+
+    La scorciatoia parametrica non e' praticabile: le pieghe condividono gran
+    parte dell'insieme di addestramento, la varianza della convalida incrociata a
+    k pieghe non ammette stimatore non distorto (Bengio & Grandvalet, 2004) e i
+    test costruiti sulle pieghe hanno errore di primo tipo gonfiato (Dietterich,
+    1998).
+
+    Returns:
+        Una riga per modello e per confronto, con differenza media, vittorie
+        sulle pieghe e valore p di Wilcoxon.
+    """
+    from scipy.stats import wilcoxon
+
+    scores = per_fold.pivot_table(
+        index=["model", "fold"], columns="sottoinsieme", values="auc_roc"
+    )
+
+    records = []
+    for model in per_fold["model"].drop_duplicates():
+        subset = scores.loc[model]
+        for left, right in FAMILY_COMPARISONS:
+            if left not in subset.columns or right not in subset.columns:
+                continue
+            difference = subset[left] - subset[right]
             records.append({
-                "sottoinsieme": label,
-                "n_biomarcatori": len(subset),
                 "model": model,
-                "auc_roc_medio": float(scores.mean()),
-                "auc_roc_std": float(scores.std(ddof=0)),
+                "sottoinsieme_a": left,
+                "sottoinsieme_b": right,
+                "diff_media": round(float(difference.mean()), 4),
+                "vittorie_a": int((difference > 0).sum()),
+                "n_pieghe": int(len(difference)),
+                "p_wilcoxon": round(float(wilcoxon(subset[left], subset[right]).pvalue), 4),
+                "p_minimo_ottenibile": round(2.0 / (2 ** len(difference)), 4),
             })
+
     return pd.DataFrame(records)
 
 
@@ -838,11 +967,20 @@ def main() -> None:
     predictions["block"] = predictions["row"].map(dict(enumerate(groups)))
     predictions.to_csv(OUTPUT_DIR / "out_of_fold_predictions.csv", index=False)
 
-    print("[Fase 4] Ablazione per famiglia di biomarcatori...")
-    ablation = feature_family_ablation(
+    print("[Fase 4] Contributo per famiglia di biomarcatori...")
+    contribution = feature_family_contribution(
         X, data.y, reduction.kept_features, models, groups, seed=SEED, n_splits=N_SPLITS
     )
-    ablation.to_csv(OUTPUT_DIR / "ablation_by_family.csv", index=False)
+    # Le AUC per piega vanno conservate: i sottoinsiemi condividono le stesse
+    # pieghe, quindi il confronto fra famiglie e' appaiato e senza queste righe
+    # nessun test appaiato sarebbe ricalcolabile dagli artefatti.
+    contribution.to_csv(OUTPUT_DIR / "contribution_by_family.csv", index=False)
+    summarise_contribution(contribution).to_csv(
+        OUTPUT_DIR / "contribution_by_family_summary.csv", index=False
+    )
+    paired_family_tests(contribution).to_csv(
+        OUTPUT_DIR / "contribution_paired_tests.csv", index=False
+    )
 
     print(f"[Fase 4] Sensibilita' alla dimensione del blocco {BLOCK_SIZES}...")
     sensitivity = block_size_sensitivity(

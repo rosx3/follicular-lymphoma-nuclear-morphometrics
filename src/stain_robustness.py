@@ -3,7 +3,7 @@
 stain_robustness.py — La tessitura legge la cromatina o il vetrino?
 Tesi: Classificazione Linfoma Follicolare vs Tessuto Linfoide Reattivo
 ===============================================================================
-LA DOMANDA. L'ablazione per famiglie (Fase 4) mostra che cinque biomarcatori di
+LA DOMANDA. L'analisi di contributo per famiglie (Fase 4) mostra che cinque biomarcatori di
 tessitura e intensita' eguagliano da soli tutti e 33, mentre i 28 morfometrici e
 spaziali si fermano a 0.857 di AUC. Ma tessitura e intensita' del canale
 ematossilina sono anche le grandezze piu' esposte alla variabilita' tecnica:

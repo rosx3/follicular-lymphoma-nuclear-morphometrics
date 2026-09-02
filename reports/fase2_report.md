@@ -171,12 +171,18 @@ Nel dataset Zenodo (*Carreras et al., 2025*, DOI: 10.5281/zenodo.15702609) utili
 - Il rischio di data leakage in senso stretto **non è rilevante** in questo progetto specifico.
 - Lo split tra le 30 patch di Ground Truth (20 train + 10 val) avviene su campioni anatomicamente distinti.
 
-### Perché le Metriche U-Net Rimangono Comunque Conservative
+### Perché l'Impianto Sperimentale Penalizza la U-Net
 
-Indipendentemente dal data leakage, le metriche della U-Net restano **inferiori** a quelle del Watershed (Dice $57.4\%$ vs $63.7\%$) per due ragioni strutturali:
+Con i numeri del run v4 (Sezione 3.2) la U-Net **non** è inferiore al Watershed. Dice $0.8038$ contro $0.7950$, con differenza non statisticamente distinguibile (Wilcoxon appaiato, $p = 0.193$).
 
-1. **Pseudo-GT Circolare:** La Ground Truth delle 30 patch è generata algoritmicamente dallo stesso Watershed, dunque la U-Net impara a imitare un modello che la supera intrinsecamente.
-2. **Overfitting da Regime Small-Data:** 20 patch di training sono insufficienti per addestrare una rete convoluzionale su una distribuzione di 600 patch di test.
+⚠️ *Correzione del 2 settembre 2026.* Fino a questa revisione la sezione affermava il contrario, citando Dice $57.4\%$ contro $63.7\%$. Erano i valori del run v3, prodotti da una configurazione di segmentazione diversa da quella del dataset e già dichiarati superati nella nota in testa al documento e nella Sezione 7.8. La sezione non era stata aggiornata insieme alla Sezione 3.2, e il report si contraddiceva.
+
+Restano però due ragioni strutturali per cui il disegno dell'esperimento sfavorisce la U-Net. Vanno dichiarate in tesi.
+
+1. **Pseudo-GT circolare.** Il target di addestramento della U-Net è la maschera prodotta dal Watershed (`scratch/run_colab_benchmark.py:155`). La rete non impara a segmentare i nuclei. Impara a imitare il Watershed. Il suo tetto di prestazione è, in linea di principio, la qualità del maestro.
+2. **Overfitting da regime small-data.** 20 patch di addestramento sono poche per una rete convoluzionale, tanto più se la distribuzione di riferimento è quella delle 600 patch del dataset.
+
+Da qui la lettura corretta del pareggio. Una rete addestrata sulle maschere del Watershed non riesce ad andare oltre il proprio maestro in modo misurabile. La rivendicazione difendibile resta quella della Sezione 4: parità a costo nullo, non superiorità di nessuno dei due.
 
 ### Dichiarazione da Inserire nella Tesi (Sezione Limitazioni)
 

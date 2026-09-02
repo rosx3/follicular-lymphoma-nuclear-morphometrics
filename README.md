@@ -63,7 +63,7 @@ testNuovoTesi/
 │   │   ├── features_nuclei_all.csv        # 94.042 nuclei, morfometria per singolo nucleo
 │   │   ├── separability_tests.csv         # Test FL vs REACTIVE con correzione FDR
 │   │   └── feature_extraction_metadata.json  # Parametri e ambiente (riproducibilità)
-│   └── fase4_classification/              # Metriche, modello, SHAP, ablazione e robustezza
+│   └── fase4_classification/              # Metriche, modello, SHAP, contributo per famiglia e robustezza
 │
 ├── img/                                   # Grafici, anteprime e visualizzazioni visive
 │   ├── fase1/                             # Preview normalizzazione e separazione croma
@@ -86,7 +86,7 @@ testNuovoTesi/
 │   ├── 02_segmentation.py                 # Marker-Controlled Watershed v4.3 + U-Net PyTorch
 │   ├── 03_feature_extraction.py           # Estrazione biomarcatori morfometrici/spaziali
 │   ├── feature_analysis.py                # Test di separabilità FL vs REACTIVE e figure
-│   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione, SHAP, ablazione
+│   ├── 04_classification.py               # ⭐ ML Tabulare & XAI — doppia validazione, SHAP, contributo per famiglia
 │   ├── stain_robustness.py                # La tessitura legge la cromatina o il vetrino?
 │   ├── gui_core.py                        # Logica dell'interfaccia (riusa la pipeline, no duplicati)
 │   └── gui.py                             # ⭐ Interfaccia Streamlit — `streamlit run src/gui.py`
@@ -166,7 +166,7 @@ testNuovoTesi/
 - **Biomarcatore dominante:** `lbp_entropy` (importanza SHAP $3.15$, il doppio del secondo), primo anche nei test univariati della Fase 3.
 - **Scoperta multivariata:** `solidity_mean` è terza per SHAP ma trentanovesima in Fase 3. Le medie di classe sono quasi identiche ($p = 0.106$) ma le **dispersioni** no (Levene $p = 3.0 \times 10^{-6}$): nel linfoma la solidità nucleare è più eterogenea, e valori estremi in entrambe le direzioni indicano FL. Un effetto di dispersione che il confronto fra medie non poteva rilevare — il **pleomorfismo nucleare**.
 - **Gli errori non sono sparsi:** 28 blocchi su 60 non sbagliano nulla, 4 sbagliano più della metà. Il modello fallisce su pochi casi difficili, e su quelli fallisce quasi sempre.
-- **Ablazione per famiglia — a decidere è la tessitura, non la morfometria.** Cinque biomarcatori di tessitura e intensità eguagliano da soli tutti e 33; i 28 morfometrici e spaziali si fermano a $0.857$.
+- **Contributo per famiglia — a decidere è la tessitura, non la morfometria.** Cinque biomarcatori di tessitura e intensità arrivano da soli a $0.944$; i 28 morfometrici e spaziali si fermano a $0.857$. Indicazione coerente su tre modelli, non un confronto statisticamente dimostrato (report §4.4).
 
   | Sottoinsieme | n | XGBoost |
   |---|:---:|:---:|
