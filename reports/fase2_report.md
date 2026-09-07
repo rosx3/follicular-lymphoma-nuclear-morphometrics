@@ -70,7 +70,9 @@ I valori misurano l'**accordo** con Cellpose, non una prestazione assoluta: Cell
 - **Linfoma Follicolare (FL):** Dice $0.8119$, AJI $0.5697$, F1 Detection $0.7420$
 - **Tessuto Reattivo (REACTIVE):** Dice $0.7781$, AJI $0.5126$, F1 Detection $0.6797$
 
-Il vantaggio d'istanza del Watershed si concentra nelle patch FL (AJI $0.5697$ vs $0.5499$, F1 $0.7420$ vs $0.7238$) e si inverte nel tessuto reattivo. Con $n=5$ per classe si tratta di un'indicazione, non di un risultato.
+L'accordo con Cellpose è più alto nelle patch di linfoma follicolare che in quelle di tessuto reattivo, e lo è su tutte e tre le metriche. Con $n=5$ per classe si tratta di un'indicazione, non di un risultato.
+
+> *Nota (3 settembre 2026).* Fino a questa revisione la riga confrontava le metriche FL con una seconda coppia di valori (AJI $0.5499$, F1 $0.7238$) che erano quelli della U-Net. Rimossa la U-Net dal lavoro, quel confronto restava senza termine di paragone dichiarato.
 
 ---
 

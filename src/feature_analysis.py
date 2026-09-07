@@ -212,6 +212,68 @@ def separability_tests(df: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
     )
 
 
+def dispersion_tests(df: pd.DataFrame, alpha: float = 0.05) -> pd.DataFrame:
+    """
+    Testa se le due classi differiscono per dispersione anziche' per valore tipico.
+
+    `separability_tests` confronta tendenze centrali: due classi con la stessa
+    media e code di ampiezza diversa gli risultano indistinguibili. La solidita'
+    media e' esattamente questo caso, ed e' terza per contributo nel modello
+    multivariato pur essendo trentanovesima per separabilita'.
+
+    Il test e' quello di Brown e Forsythe, cioe' Levene con centratura sulla
+    mediana (`scipy.stats.levene(center="median")`). La centratura sulla media,
+    che e' il Levene originale, presuppone gruppi normali: su queste
+    distribuzioni asimmetriche darebbe valori piu' bassi di alcuni ordini di
+    grandezza, e sarebbe una significativita' comprata sull'assunzione sbagliata.
+
+    Args:
+        df: CSV per patch della Fase 3, con la colonna `category`.
+        alpha: soglia applicata al p-value corretto FDR.
+
+    Returns:
+        DataFrame con una riga per feature, ordinato per evidenza decrescente:
+        feature, deviazioni standard delle due classi, rapporto fra le due,
+        statistica, p_raw, p_fdr, significant.
+    """
+    records = []
+
+    for column in feature_columns(df):
+        fl, reactive = _split_by_class(df, column)
+
+        combined = np.concatenate([fl, reactive]) if len(fl) and len(reactive) else np.array([])
+        if len(fl) < 3 or len(reactive) < 3 or (len(combined) and np.ptp(combined) == 0.0):
+            records.append({
+                "feature": column,
+                "std_fl": fl.std(ddof=1) if len(fl) > 1 else np.nan,
+                "std_reactive": reactive.std(ddof=1) if len(reactive) > 1 else np.nan,
+                "std_ratio": np.nan,
+                "statistic": np.nan,
+                "p_raw": 1.0,
+            })
+            continue
+
+        result = stats.levene(fl, reactive, center="median")
+        std_fl, std_reactive = fl.std(ddof=1), reactive.std(ddof=1)
+        records.append({
+            "feature": column,
+            "std_fl": float(std_fl),
+            "std_reactive": float(std_reactive),
+            "std_ratio": float(std_fl / std_reactive) if std_reactive > 0 else np.nan,
+            "statistic": float(result.statistic),
+            "p_raw": float(result.pvalue),
+        })
+
+    results = pd.DataFrame.from_records(records)
+    if results.empty:
+        return results
+
+    results["p_fdr"] = stats.false_discovery_control(results["p_raw"].to_numpy(), method="bh")
+    results["significant"] = results["p_fdr"] < alpha
+
+    return results.sort_values("p_fdr").reset_index(drop=True)
+
+
 # ---------------------------------------------------------------------------
 # Figure per la tesi
 # ---------------------------------------------------------------------------
@@ -399,6 +461,14 @@ if __name__ == "__main__":
     n_significant = int(results["significant"].sum())
     print(f"[Analisi] Feature significative (FDR < 0.05): {n_significant} / {len(results)}")
     print(f"[Analisi] Test di separabilita' -> {output_path}")
+
+    spread = dispersion_tests(patches)
+    spread_path = fase3_dir / "dispersion_tests.csv"
+    spread.to_csv(spread_path, index=False)
+
+    n_spread = int(spread["significant"].sum())
+    print(f"[Analisi] Feature che differiscono per dispersione: {n_spread} / {len(spread)}")
+    print(f"[Analisi] Test di dispersione -> {spread_path}")
 
     img_dir = base_dir / "img" / "fase3"
     for produce, name in (
