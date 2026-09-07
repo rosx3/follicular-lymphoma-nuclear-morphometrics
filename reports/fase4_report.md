@@ -59,6 +59,50 @@ Tabella completa in `feature_reduction.csv`. La riduzione serve alla spiegabilit
 
 ---
 
+## 2.1 Modelli e Taratura degli Iperparametri
+
+*Sezione aggiunta il 3 settembre 2026: griglie e taratura annidata esistevano solo
+nel codice, e chi leggeva i report non poteva sapere che la seconda fosse stata fatta.*
+
+**I tre modelli.** Complessità crescente, definiti in `src/04_classification.py`
+(`build_models()`):
+
+| Modello | Pipeline | Motivo della presenza |
+|---|---|---|
+| Regressione logistica | `StandardScaler` + `LogisticRegression(max_iter=5000)` | Riferimento lineare interpretabile. Serve a verificare se la separazione richieda davvero un modello non lineare, invece di assumerlo. |
+| Foresta casuale | `RandomForestClassifier` | Non linearità e interazioni per aggregazione di alberi decorrelati. |
+| Potenziamento del gradiente | `XGBClassifier(eval_metric="logloss", tree_method="hist")` | Alberi costruiti in sequenza sull'errore residuo. |
+
+La standardizzazione è nella sola pipeline lineare: i due modelli ad albero sono
+invarianti a trasformazioni monotone delle variabili e non ne hanno bisogno.
+
+**Le griglie esplorate.**
+
+| Modello | Iperparametro | Valori |
+|---|---|---|
+| Regressione logistica | `C` | 0.01, 0.1, 1.0, 10.0 |
+| Foresta casuale | `n_estimators` | 300 |
+| | `max_depth` | `None`, 6 |
+| | `min_samples_leaf` | 1, 5 |
+| Potenziamento del gradiente | `n_estimators` | 300 |
+| | `max_depth` | 3, 6 |
+| | `learning_rate` | 0.05, 0.2 |
+
+**La taratura è annidata, e questo è il punto.** `GridSearchCV` gira **dentro
+ciascuna piega di addestramento**, non sull'intero dataset, con `scoring="roc_auc"`,
+`refit=True` e 3 partizioni interne (`inner_splits=3`). Il partizionamento interno
+segue quello esterno: `StratifiedKFold` con `shuffle` nella validazione casuale,
+`GroupKFold` sui gruppi della piega di addestramento nella validazione a blocchi.
+
+Ne segue che i dati su cui si misurano le prestazioni non partecipano mai alla
+scelta della configurazione. Sceglierli guardando anche il test gonfierebbe le
+metriche nello stesso modo del leakage analizzato in §3.1, applicato però agli
+iperparametri anziché alle righe. La configurazione vincente può quindi differire
+da piega a piega, ed è corretto che sia così: è la procedura a essere valutata,
+non una singola configurazione.
+
+---
+
 ## 3. Validazione e Risultati
 
 ### 3.0 Perché due validazioni, e perché blocchi contigui

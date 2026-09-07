@@ -169,12 +169,13 @@ Immagine Raw RGB (224×224 px)
 
 ### 2. Filtro Bilaterale vs. Filtro Gaussiano
 * **Scelta:** Filtro Bilaterale con kernel $d=9$, $\sigma_{\text{color}}=75$, $\sigma_{\text{space}}=75$.
-* **Motivazione Scientifica:** Il filtro Gaussiano attua una sfocatura uniforme che ammorbidisce e fonde i contorni delle membrane di nuclei adiacenti a contatto, ostacolandone la separazione. Il filtro bilaterale combina una componente spaziale e una cromatica, attenuando il rumore nelle regioni uniformi dello stroma ma **preservando la nitidezza dei gradienti di bordo nucleare**, essenziale per gli algoritmi di segmentazione (*Schmidt et al., 2018*).
+* **Riferimento:** **Tomasi & Manduchi (1998)** — *ICCV 1998*, pp. 839-846.
+* **Motivazione Scientifica:** Il filtro Gaussiano attua una sfocatura uniforme che ammorbidisce e fonde i contorni delle membrane di nuclei adiacenti a contatto, ostacolandone la separazione. Il filtro bilaterale pondera i pixel vicini secondo due componenti simultanee, la distanza spaziale e la differenza di intensità: due pixel separati da un bordo nucleare hanno intensità molto diverse e il loro contributo reciproco viene ridotto, cosicché il rumore si attenua nelle regioni omogenee dello stroma ma **i gradienti di bordo nucleare restano nitidi** (*Tomasi & Manduchi, 1998*).
 
 ### 3. Deconvoluzione Cromatica di Ruifrok & CLAHE Adattivo
 * **Scelta:** Deconvoluzione Ruifrok & Johnston seguita da CLAHE su griglia 8×8.
-* **Riferimenti:** **Ruifrok & Johnston (2001)** — *Anal. Quant. Cytol. Histol.* 23(4):291-9.
-* **Motivazione Scientifica:** La matrice di deconvoluzione Ruifrok disaccoppia matematicamente il segnale dell'Ematossilina (nuclei) da quello dell'Eosina (citoplasma). Il CLAHE adattivo applicato su tile di 28×28 px (~12.9 × 12.9 µm²) opera a una scala spaziale confrontabile con quella di un nucleo linfocitario (5–10 µm) e del suo immediato intorno, aumentando il contrasto della cromatina nucleare senza amplificare il rumore stromatico globale (*Sung et al., 2024*).
+* **Riferimenti:** **Ruifrok & Johnston (2001)** — *Anal. Quant. Cytol. Histol.* 23(4):291-9; **Zuiderveld (1994)** — *Graphics Gems IV*, pp. 474-485.
+* **Motivazione Scientifica:** La matrice di deconvoluzione Ruifrok disaccoppia matematicamente il segnale dell'Ematossilina (nuclei) da quello dell'Eosina (citoplasma). Il CLAHE adattivo applicato su tile di 28×28 px (~12.9 × 12.9 µm²) opera a una scala spaziale confrontabile con quella di un nucleo linfocitario (5–10 µm) e del suo immediato intorno; il limite di contrasto pari a 2.0 impedisce l'amplificazione del rumore nelle regioni quasi uniformi, che è il difetto dell'equalizzazione adattiva non limitata (*Zuiderveld, 1994*).
 
 ---
 
@@ -220,4 +221,5 @@ Immagine Raw RGB (224×224 px)
 2. **Macenko M, Niethammer M, Marron JS, et al.** (2009). *A method for normalizing histology slides for quantitative analysis*. **IEEE ISBI**, pp. 1107-1110. DOI: 10.1109/ISBI.2009.5193250.
 3. **Ruifrok AC, Johnston DA.** (2001). *Quantification of histochemical staining by color deconvolution*. **Analytical and Quantitative Cytology and Histology**, 23(4), 291-299.
 4. **Iwamoto R, Nishikawa T, Musangile FY, et al.** (2024). *Small sized centroblasts as poor prognostic factor in follicular lymphoma - Based on artificial intelligence analysis*. **Computers in Biology and Medicine**, 178, 108774. DOI: 10.1016/j.compbiomed.2024.108774.
-5. **Sung YN, Lee H, Kim E, et al.** (2024). *Interpretable deep learning model to predict lymph node metastasis in early gastric cancer using whole slide images*. **American Journal of Cancer Research**, 14(7), 3513-3522. PMID: 39113689.
+5. **Tomasi C, Manduchi R.** (1998). *Bilateral filtering for gray and color images*. **Sixth International Conference on Computer Vision (ICCV)**, pp. 839-846. DOI: 10.1109/ICCV.1998.710815. *(Fonte primaria del filtro adottato allo Step 2; sostituisce Schmidt et al. 2018, che tratta la segmentazione a poligoni stellari e non il filtraggio.)*
+6. **Zuiderveld K.** (1994). *Contrast Limited Adaptive Histogram Equalization*. In **Graphics Gems IV**, Elsevier, pp. 474-485. DOI: 10.1016/B978-0-12-336156-1.50061-6. *(Fonte primaria del CLAHE adottato allo Step 3; sostituisce Sung et al. 2024, che non discute la scala dei riquadri né il limite di contrasto.)*

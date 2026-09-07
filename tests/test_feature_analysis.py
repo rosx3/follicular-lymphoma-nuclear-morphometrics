@@ -17,7 +17,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from feature_analysis import METADATA_COLUMNS, describe_by_class, separability_tests
+from feature_analysis import (
+    METADATA_COLUMNS,
+    describe_by_class,
+    dispersion_tests,
+    separability_tests,
+)
 
 SRC_DIR = Path(__file__).resolve().parent.parent / "src"
 
@@ -166,3 +171,89 @@ def test_the_real_dataset_yields_one_row_for_each_of_the_47_features():
     result = separability_tests(pd.read_csv(csv_path))
 
     assert len(result) == 47
+
+
+# ---------------------------------------------------------------------------
+# Dispersione: due classi possono avere lo stesso valore tipico e disperdersi
+# in modo diverso. Il confronto fra tendenze centrali non lo vede.
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def spread_frame():
+    """Stessa media, dispersione diversa; e una coppia identica per contrasto."""
+    rng = np.random.default_rng(1)
+    n = 60
+    return _frame(
+        stessa_media_dispersione_diversa=np.concatenate(
+            [rng.normal(10, 4, n), rng.normal(10, 1, n)]
+        ),
+        identica=np.concatenate([rng.normal(5, 1, n), rng.normal(5, 1, n)]),
+    )
+
+
+def test_a_difference_in_spread_is_detected_where_the_means_agree(spread_frame):
+    means = separability_tests(spread_frame).set_index("feature")
+    spread = dispersion_tests(spread_frame).set_index("feature")
+
+    colonna = "stessa_media_dispersione_diversa"
+    assert not bool(means.loc[colonna, "significant"])
+    assert bool(spread.loc[colonna, "significant"])
+
+
+def test_equal_distributions_show_no_difference_in_spread(spread_frame):
+    spread = dispersion_tests(spread_frame).set_index("feature")
+
+    assert not bool(spread.loc["identica", "significant"])
+
+
+def test_the_spread_test_is_the_median_centred_variant(spread_frame):
+    """
+    Brown-Forsythe, non Levene originale.
+
+    La centratura sulla mediana cambia il risultato di ordini di grandezza su
+    distribuzioni non normali, ed e' quella che il numero citato in tesi
+    presuppone: il nome dichiarato deve corrispondere al calcolo eseguito.
+    """
+    from scipy import stats
+
+    colonna = "stessa_media_dispersione_diversa"
+    fl = spread_frame.loc[spread_frame["category"] == FL, colonna].to_numpy()
+    reactive = spread_frame.loc[spread_frame["category"] == REACTIVE, colonna].to_numpy()
+
+    atteso = stats.levene(fl, reactive, center="median").pvalue
+    ottenuto = dispersion_tests(spread_frame).set_index("feature").loc[colonna, "p_raw"]
+
+    assert ottenuto == pytest.approx(atteso)
+
+
+def test_the_reported_standard_deviations_are_those_of_the_two_classes(spread_frame):
+    spread = dispersion_tests(spread_frame).set_index("feature")
+    described = describe_by_class(spread_frame)
+
+    colonna = "stessa_media_dispersione_diversa"
+    assert spread.loc[colonna, "std_fl"] == pytest.approx(described.loc[colonna, "std_fl"])
+    assert spread.loc[colonna, "std_reactive"] == pytest.approx(
+        described.loc[colonna, "std_reactive"]
+    )
+
+
+def test_solidity_separates_the_classes_by_spread_and_not_by_typical_value():
+    """
+    Il risultato piu' originale della tesi, fissato sul dataset reale.
+
+    La solidita' media e' terza per contributo SHAP e trentanovesima per
+    separabilita': la ragione e' che le due classi hanno lo stesso valore
+    tipico e dispersioni diverse. Se questo test cade, il paragrafo sul
+    pleomorfismo nucleare non e' piu' sostenuto dai dati.
+    """
+    csv_path = Path(__file__).resolve().parent.parent / "data" / "fase3_features" / "features_patches_master.csv"
+    if not csv_path.exists():
+        pytest.skip("features_patches_master.csv non presente: eseguire la Fase 3.")
+
+    patches = pd.read_csv(csv_path)
+    means = separability_tests(patches).set_index("feature")
+    spread = dispersion_tests(patches).set_index("feature")
+
+    assert not bool(means.loc["solidity_mean", "significant"])
+    assert means.loc["solidity_mean", "p_raw"] == pytest.approx(0.106, abs=0.001)
+    assert spread.loc["solidity_mean", "p_raw"] == pytest.approx(3.05e-06, rel=0.02)
+    assert spread.loc["solidity_mean", "std_fl"] > spread.loc["solidity_mean", "std_reactive"]
